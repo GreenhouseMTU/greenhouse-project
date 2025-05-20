@@ -1,0 +1,58 @@
+version: '2.2'
+services:
+  backend:
+    container_name: backend-greenhouse
+    build:
+      context: ./backend
+      dockerfile: ./Dockerfile   # Location of the Dockerfile in the Docker context 
+    image: greenhouse/backend:latest
+    ports:
+      - "8080:8080"
+    environment:     # Allow backend to have access to db, logs...
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=adminNIMBUS-1
+      - DB_DB=greenhouse
+    restart: always
+    depends_on:
+      - db
+    networks:
+      - back-network
+
+  db:
+    image: mariadb:10.7
+    restart: always
+    container_name: db-greenhouse
+    environment:
+      - MYSQL_ROOT_PASSWORD=adminNIMBUS-1
+      - MYSQL_DATABASE=greenhouse
+ 
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - back-network
+
+  frontend:
+    container_name: frontend-greenhouse
+    build:
+      context: ./frontend
+      dockerfile: ./Dockerfile
+    ports:
+            - "8079:80"
+    restart: always
+    networks:
+      - front-network
+
+networks:     # Separate networks
+  back-network:
+    driver: bridge    
+    ipam:
+      driver: default
+  front-network:
+    driver: bridge
+    ipam:
+      driver: default
+
+volumes:
+  db-data:
+

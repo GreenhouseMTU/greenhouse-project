@@ -1,0 +1,104 @@
+@font-face {
+    font-family: 'League Spartan';
+    src: url('../../../fonts/LeagueSpartan.ttf') format('truetype');
+}
+@keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 1s ease-in-out; /* Utilisez le nom de votre animation et les paramètres appropriés */
+  }
+
+.login{
+    margin: 0;
+    padding: 0;
+}
+
+.greenRectangle{
+    width: 400px;
+    height: auto;
+    background-color: #9DC08B;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 40px;
+    text-align: center;
+}
+
+.titleGreenhouse{
+    color: #40513B;
+    font-family: 'League Spartan', sans-serif;
+    font-size: 34px;
+    font-weight: 720;
+}
+
+.greenLine{
+    background-color: #609966;
+    width: 80%;
+    height: 2px;
+    margin: auto;
+}
+
+.titleCreateAccount{
+    color: #40513B;
+    font-family: 'League Spartan', sans-serif;
+    font-size: 24px;
+}
+
+.input{
+    width: 80%;
+    border-radius: 5px;
+    background-color: #EDF1D6;
+    font-size: 16px;
+    font-weight: 800;
+    font-family: 'League Spartan', sans-serif;
+    padding: 1em 0.5em;
+    border: none;
+    outline: none;
+    margin-bottom: 20px;
+}
+.input::placeholder{
+    color: #B1A9A9;
+}
+
+.button{
+    background-color:#6b6c6b;
+	border-radius:12px;
+    border: none;
+	display:inline-block;
+	cursor:pointer;
+	color:#edf1d6;
+	font-family: 'League Spartan', sans-serif;
+	font-size:18px;
+	font-weight:bold;
+	padding:10px 20%;
+	text-decoration:none;
+}
+
+.space{
+    height: 20px;
+    cursor: default;
+}
+
+.login{
+    font-family: 'League Spartan', sans-serif;
+    color: #40513B;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+
+@media (max-width: 430px) {
+    .greenRectangle {
+        width: 80%;
+    }
+}
