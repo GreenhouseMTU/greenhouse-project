@@ -30,6 +30,12 @@ function Login() {
         setPassword(event.target.value);
     };      
 
+    const processLogin = () => {
+      console.log("Function defined");
+      console.log("Login clicked");
+    };
+
+
   return (
     <div className={`login ${isFadedIn ? 'fade-in' : ''}`}>
       <div className='greenRectangle'>
@@ -37,8 +43,8 @@ function Login() {
            <div className='greenLine'></div>
            <h2 className='titleCreateAccount'>{subtitle}</h2>
            <form>
-                <input className='input' type='text' placeholder='Username' />
-                <input className='input' type='password' placeholder='Password' />
+                <input className='input' type='text' placeholder='Username' value={username} onChange={handleUsernameChange} />
+                <input className='input' type='password' placeholder='Password' value={password} onChange={handlePasswordChange} />
            </form>
            <button className='button' onClick={processLogin}>{button1}</button>
            <div className='space'></div>
