@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 import datetime
 from flask_jwt_extended import jwt_required
 from models import Sensor_CO2TempHum_ext
+from db import db
 
 sensor_co2temphum_ext_app = Blueprint('sensor_co2temphum_ext_app', __name__)
 
@@ -11,7 +12,6 @@ current_date = datetime.date.today()
 @sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/latest', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumExt():
-    db = current_app.db
     sensorCO2TempHumExtLatestValue = db.session.query(Sensor_CO2TempHum_ext).order_by(Sensor_CO2TempHum_ext.id.desc()).first()
     if sensorCO2TempHumExtLatestValue is not None:
         serialized_data = sensorCO2TempHumExtLatestValue.serialize()
@@ -20,11 +20,64 @@ def get_sensorCO2TempHumExt():
     else:
         return jsonify({'message': 'No data available'}), 404
 
+
+
+# Nouveau endpoint pic-average pour Sensor_CO2TempHum_ext
+
+@sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/day/pic-average', methods=['GET'])
+@jwt_required()
+def get_sensorCO2TempHumExtPicAverage():
+    now = datetime.datetime.now()
+    formatted_date = now.strftime('%Y-%m-%d')
+
+    data_entries = db.session.query(Sensor_CO2TempHum_ext).filter(Sensor_CO2TempHum_ext.datetime.like(f'%{formatted_date}%')).all()
+
+    # Initialisation
+    max_day = {'CO2': None, 'Temp': None, 'Hum': None}
+    max_night = {'CO2': None, 'Temp': None, 'Hum': None}
+
+    for entry in data_entries:
+        hour = entry.datetime.hour
+
+        # jour ou nuit
+        period = 'day' if 6 <= hour < 20 else 'night'
+
+        # Récupère les valeurs du capteur
+        val_CO2 = int(entry.valueCO2)
+        val_Temp = int(entry.valueTemp)
+        val_Hum = int(entry.valueHum)
+
+        # Fonction de comparaison
+        def update_max(val, current_max):
+            return val if current_max is None or val > current_max else current_max
+
+        if period == 'day':
+            max_day['CO2'] = update_max(val_CO2, max_day['CO2'])
+            max_day['Temp'] = update_max(val_Temp, max_day['Temp'])
+            max_day['Hum'] = update_max(val_Hum, max_day['Hum'])
+        else:
+            max_night['CO2'] = update_max(val_CO2, max_night['CO2'])
+            max_night['Temp'] = update_max(val_Temp, max_night['Temp'])
+            max_night['Hum'] = update_max(val_Hum, max_night['Hum'])
+
+    # On calcule les pic-averages
+    result = {}
+
+    for key in ['CO2', 'Temp', 'Hum']:
+        day_max = max_day[key] if max_day[key] is not None else 0
+        night_max = max_night[key] if max_night[key] is not None else 0
+        pic_avg = round((day_max + night_max) / 2, 2)
+        result[f'max_day_{key}'] = day_max
+        result[f'max_night_{key}'] = night_max
+        result[f'pic_average_{key}'] = pic_avg
+
+    return jsonify(result)
+
+
 # This endpoint is used to get an average by hour of the current day
 @sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/day/average', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumExtDayAverage():
-    db = current_app.db
     current_date = datetime.datetime.now()
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensorCO2TempHumExtDayAverageValues = db.session.query(Sensor_CO2TempHum_ext).filter(Sensor_CO2TempHum_ext.datetime.like(f'%{formatted_date}%')).all()
@@ -69,7 +122,6 @@ def get_sensorCO2TempHumExtDayAverage():
 @sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/day', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumExtDay():
-    db = current_app.db
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensors = db.session.query(Sensor_CO2TempHum_ext).filter(Sensor_CO2TempHum_ext.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
@@ -78,10 +130,10 @@ def get_sensorCO2TempHumExtDay():
 @sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/week', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumExtWeek():
-    db = current_app.db
-    current_date = datetime.datetime.now()
-    start_date_week = current_date - datetime.timedelta(days=7)
-    end_date_week = current_date
+    offset = int(request.args.get('offset', 0))
+    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
+    start_date_week = now - datetime.timedelta(days=7)
+    end_date_week = now
 
     sensorCO2TempHumExtWeekValues = db.session.query(Sensor_CO2TempHum_ext).filter(
         Sensor_CO2TempHum_ext.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
@@ -124,7 +176,6 @@ def get_sensorCO2TempHumExtWeek():
 @sensor_co2temphum_ext_app.route('/api/sensors/sensor_co2temphum_ext/month', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumExtMonth():
-    db = current_app.db
     current_date = datetime.datetime.now()
     start_date_month = current_date - datetime.timedelta(days=30)
     

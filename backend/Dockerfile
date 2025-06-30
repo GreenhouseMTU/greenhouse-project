@@ -2,6 +2,7 @@
 FROM python:3.8
 
 # Install ping tool
+RUN ln -sf /usr/share/zoneinfo/Europe/Dublin /etc/localtime && echo "Europe/Dublin" > /etc/timezone
 RUN apt-get update && apt-get install -y iputils-ping
 
 # Define the work directory inside of the container

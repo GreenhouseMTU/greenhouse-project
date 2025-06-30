@@ -26,11 +26,12 @@ services:
     environment:
       - MYSQL_ROOT_PASSWORD=adminNIMBUS-1
       - MYSQL_DATABASE=greenhouse
- 
     volumes:
-      - db-data:/var/lib/mysql
+      - ./db-data:/var/lib/mysql   # <-- Corrigé ici
     networks:
       - back-network
+    ports:
+      - "3306:3306" 
 
   frontend:
     container_name: frontend-greenhouse
@@ -38,7 +39,7 @@ services:
       context: ./frontend
       dockerfile: ./Dockerfile
     ports:
-            - "8079:80"
+            - "8079:8079"
     restart: always
     networks:
       - front-network
@@ -54,5 +55,4 @@ networks:     # Separate networks
       driver: default
 
 volumes:
-  db-data:
-
+  db-data:      # Database

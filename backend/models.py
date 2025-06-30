@@ -1,4 +1,4 @@
-from app import db
+from db import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # This file contain all the class of the projects who are also used to create the database
@@ -22,7 +22,7 @@ class Sensor_light_ext(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
             'value': self.value,
         }
     
@@ -34,7 +34,7 @@ class Sensor_light_int(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
             'value': self.value,
         }
 
@@ -48,10 +48,10 @@ class Sensor_CO2TempHum_ext(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
             'valueCO2': self.valueCO2,
             'valueTemp': self.valueTemp,
-            'valueHum': self.valueHum
+            'valueHum': self.valueHum,
         }
     
 class Sensor_CO2TempHum_int(db.Model):
@@ -64,10 +64,10 @@ class Sensor_CO2TempHum_int(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),
             'valueCO2': self.valueCO2,
             'valueTemp': self.valueTemp,
-            'valueHum': self.valueHum
+            'valueHum': self.valueHum,
         }
     
 class Sensor_SMTempEC_1(db.Model):
@@ -80,7 +80,7 @@ class Sensor_SMTempEC_1(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),  # <-- conversion ici
             'valueSM': self.valueSM,
             'valueTemp': self.valueTemp,
             'valueEC': self.valueEC
@@ -96,7 +96,7 @@ class Sensor_SMTempEC_2(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),  # <-- conversion ici
             'valueSM': self.valueSM,
             'valueTemp': self.valueTemp,
             'valueEC': self.valueEC
@@ -112,7 +112,7 @@ class Sensor_SMTempEC_3(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),  # <-- conversion ici
             'valueSM': self.valueSM,
             'valueTemp': self.valueTemp,
             'valueEC': self.valueEC
@@ -128,7 +128,7 @@ class Sensor_SMTempEC_4(db.Model):
     def serialize(self):
         return {
             'id': self.id,
-            'datetime': self.datetime,
+            'datetime': self.datetime.strftime('%Y-%m-%d %H:%M:%S'),  # <-- conversion ici
             'valueSM': self.valueSM,
             'valueTemp': self.valueTemp,
             'valueEC': self.valueEC

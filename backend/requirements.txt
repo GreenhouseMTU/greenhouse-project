@@ -8,3 +8,4 @@ PyMySQL==1.1.0
 Werkzeug==2.3.6
 Flask-cors==4.0.0
 Waitress==2.1.2
+pytz==2023.3

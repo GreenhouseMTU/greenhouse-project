@@ -2,16 +2,18 @@ from flask import Blueprint, request, jsonify, current_app
 import datetime
 from flask_jwt_extended import jwt_required
 from models import Sensor_light_ext
+from db import db
 
 sensor_light_ext_app = Blueprint('sensor_light_ext_app', __name__)
 
 current_date = datetime.date.today()
 
+
 # This endpoint is used to get the latest value
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/latest', methods=['GET'])
 @jwt_required()
 def get_sensorLightExt():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     sensorLightExtLatestValue = db.session.query(Sensor_light_ext).order_by(Sensor_light_ext.id.desc()).first()
     if sensorLightExtLatestValue is not None:
         serialized_data = sensorLightExtLatestValue.serialize()
@@ -19,12 +21,53 @@ def get_sensorLightExt():
         return jsonify(serialized_data)
     else:
         return jsonify({'message': 'No data available'}), 404
+    
+
+# Nouveau endpoint pic-average pour Sensor_light_ext
+
+@sensor_light_ext_app.route('/api/sensors/sensor_light_ext/day/pic-average', methods=['GET'])
+@jwt_required()
+def get_sensorLightExtPicAverage():
+    # utilise directement db.session.query(...)
+    now = datetime.datetime.now()
+    formatted_date = now.strftime('%Y-%m-%d')
+
+    data_entries = db.session.query(Sensor_light_ext).filter(Sensor_light_ext.datetime.like(f'%{formatted_date}%')).all()
+
+    max_day = None
+    max_night = None
+
+    for entry in data_entries:
+        hour = entry.datetime.hour
+        value = int(entry.value)
+
+        if 6 <= hour < 20:
+            if max_day is None or value > max_day:
+                max_day = value
+        else:
+            if max_night is None or value > max_night:
+                max_night = value
+
+    # Sécurité : si aucune valeur n'a été trouvée pour la période
+    max_day = max_day if max_day is not None else 0
+    max_night = max_night if max_night is not None else 0
+
+    pic_average = round((max_day + max_night) / 2, 2)
+
+    result = {
+        'max_day': max_day,
+        'max_night': max_night,
+        'pic_average': pic_average
+    }
+
+    return jsonify(result)
+
 
 # This endpoint is used to get an average by hour of the current day
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/day/average', methods=['GET'])
 @jwt_required()
 def get_sensorLightExtDayAverage():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensorLightExtDayAverageValues = db.session.query(Sensor_light_ext).filter(Sensor_light_ext.datetime.like(f'%{formatted_date}%')).all()
 
@@ -49,7 +92,7 @@ def get_sensorLightExtDayAverage():
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/day', methods=['GET'])
 @jwt_required()
 def get_sensorLightExtDay():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensors = db.session.query(Sensor_light_ext).filter(Sensor_light_ext.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
@@ -57,14 +100,15 @@ def get_sensorLightExtDay():
 # This endpoint is used to get an average by hour of the values for a week
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/week', methods=['GET'])
 @jwt_required()
-def get_sensorLightExtWeekAverage():
-    db = current_app.db
-    end_date_week = datetime.datetime.now()
-    start_date_week = end_date_week - datetime.timedelta(days=7)
-    
+def get_sensorLightExtWeek():
+    offset = int(request.args.get('offset', 0))
+    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
+    start_date_week = now - datetime.timedelta(days=7)
+    end_date_week = now
+
     sensorLightExtWeekValues = db.session.query(Sensor_light_ext).filter(
-        Sensor_light_ext.datetime >= start_date_week,
-        Sensor_light_ext.datetime <= end_date_week
+        Sensor_light_ext.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
+        Sensor_light_ext.datetime <= end_date_week.strftime('%Y-%m-%d %H:%M:%S')
     ).all()
 
     hourly_avg_values = {}  # Store hourly average values here
@@ -95,7 +139,7 @@ def get_sensorLightExtWeekAverage():
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/month', methods=['GET'])
 @jwt_required()
 def get_sensorLightExtMonthAverage():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     end_date_month = datetime.datetime.now()
     start_date_month = end_date_month - datetime.timedelta(days=30)
     

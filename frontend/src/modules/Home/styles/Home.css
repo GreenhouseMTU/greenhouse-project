@@ -1,0 +1,185 @@
+.home-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'League Spartan', sans-serif;
+  color: #40513B;
+}
+
+.home-container::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #EDF1D6;
+  background-image: url('/background.jpg');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.7; /* même opacité que login */
+  z-index: -1;
+}
+
+
+.project-circle {
+  position: relative;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.project-circle:hover {
+  transform: scale(1.1);
+}
+
+.project-circle.hovered::before {
+  content: '';
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  z-index: -1;
+  animation: pulse 1.5s infinite;
+}
+
+.project-info {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.project-info-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: url('/Greenhouse.jpg') no-repeat center center;
+  background-size: cover;
+  opacity: 0.5;
+  z-index: 1;
+}
+
+.project-circle h1, .project-circle p {
+  position: relative;
+  z-index: 3;
+  color: #40513B;
+}
+
+.project-circle h1 {
+  font-size: 54px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  margin-top: 0;
+  letter-spacing: 1px;
+}
+
+.project-circle p {
+  font-size: 28px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.project-info .select-project-btn {
+  position: absolute;
+  bottom: 50px;
+  z-index: 3;
+  padding: 10px 20px;
+  background: #9DC08B;
+  border: 2px solid #40513B;
+  color: #40513B;
+  font-family: 'League Spartan', sans-serif;
+  font-size: 1.3rem;
+  font-weight: bold;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: background-color 0.3s, border-color 0.3s, color 0.3s;
+}
+
+.select-project-btn:hover {
+  background-color: #8AB17D;
+  border-color: #40513B;
+  color: #fff;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.welcome-message {
+  font-size: 40px;
+  color: #40513B;
+  margin-bottom: 40px;
+  font-weight: 600;
+}
+
+@media (max-width: 1024px) {
+  .project-circle {
+    width: 350px;
+    height: 350px;
+  }
+
+  .project-circle h1 {
+    font-size: 42px;
+  }
+
+  .project-circle p {
+    font-size: 22px;
+  }
+
+  .welcome-message {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .project-circle {
+    width: 280px;
+    height: 280px;
+  }
+
+  .project-circle h1 {
+    font-size: 32px;
+  }
+
+  .project-circle p {
+    font-size: 18px;
+  }
+
+  .project-info .select-project-btn {
+    font-size: 1rem;
+    padding: 8px 16px;
+    bottom: 30px;
+  }
+
+  .welcome-message {
+    font-size: 26px;
+    margin-bottom: 20px;
+  }
+}

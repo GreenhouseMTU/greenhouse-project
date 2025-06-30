@@ -1,13 +1,13 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token
 from models import User
+from db import db
 
 auth_app = Blueprint('auth_app', __name__)
 
 # Register
 @auth_app.route('/api/users', methods=['POST'])
 def add_user():
-    db = current_app.db
     new_user_data = request.json
     username = new_user_data.get('username')
     password = new_user_data.get('password')
@@ -30,7 +30,6 @@ def add_user():
 # Login
 @auth_app.route('/api/login', methods=['POST'])
 def login():
-    db = current_app.db
     username = request.json.get('username')
     password = request.json.get('password')
 

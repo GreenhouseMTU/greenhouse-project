@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, current_app
 import datetime
 from flask_jwt_extended import jwt_required
 from models import Sensor_SMTempEC_2
+from db import db
 
 sensor_smtempec_2_app = Blueprint('sensor_smtempec_2_app', __name__)
 
@@ -11,7 +12,7 @@ current_date = datetime.date.today()
 @sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/latest', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC2():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     sensorSMTempEC2LatestValue = db.session.query(Sensor_SMTempEC_2).order_by(Sensor_SMTempEC_2.id.desc()).first()
     if sensorSMTempEC2LatestValue is not None:
         serialized_data = sensorSMTempEC2LatestValue.serialize()
@@ -19,12 +20,81 @@ def get_sensorSMTempEC2():
         return jsonify(serialized_data)
     else:
         return jsonify({'message': 'No data available'}), 404
+    
+
+# Nouveau endpoint pic-average pour Sensor_SMTempEC_2
+
+@sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/day/pic-average', methods=['GET'])
+@jwt_required()
+def get_sensorSMTempEC2PicAverage():
+    # utilise directement db.session.query(...)
+    now = datetime.datetime.now()
+    formatted_date = now.strftime('%Y-%m-%d')
+
+    data_entries = db.session.query(Sensor_SMTempEC_2).filter(Sensor_SMTempEC_2.datetime.like(f'%{formatted_date}%')).all()
+
+    max_day_SM = None
+    max_night_SM = None
+
+    max_day_Temp = None
+    max_night_Temp = None
+
+    max_day_EC = None
+    max_night_EC = None
+
+    for entry in data_entries:
+        hour = entry.datetime.hour
+        valueSM = int(entry.valueSM)
+        valueTemp = int(entry.valueTemp)
+        valueEC = int(entry.valueEC)
+
+        if 6 <= hour < 20:
+            # Jour
+            max_day_SM = valueSM if max_day_SM is None or valueSM > max_day_SM else max_day_SM
+            max_day_Temp = valueTemp if max_day_Temp is None or valueTemp > max_day_Temp else max_day_Temp
+            max_day_EC = valueEC if max_day_EC is None or valueEC > max_day_EC else max_day_EC
+        else:
+            # Nuit
+            max_night_SM = valueSM if max_night_SM is None or valueSM > max_night_SM else max_night_SM
+            max_night_Temp = valueTemp if max_night_Temp is None or valueTemp > max_night_Temp else max_night_Temp
+            max_night_EC = valueEC if max_night_EC is None or valueEC > max_night_EC else max_night_EC
+
+    # Gestion des valeurs None (si pas de mesures sur une période)
+    max_day_SM = max_day_SM if max_day_SM is not None else 0
+    max_night_SM = max_night_SM if max_night_SM is not None else 0
+    max_day_Temp = max_day_Temp if max_day_Temp is not None else 0
+    max_night_Temp = max_night_Temp if max_night_Temp is not None else 0
+    max_day_EC = max_day_EC if max_day_EC is not None else 0
+    max_night_EC = max_night_EC if max_night_EC is not None else 0
+
+    # Calcul des moyennes pic-average
+    pic_average_SM = round((max_day_SM + max_night_SM) / 2, 2)
+    pic_average_Temp = round((max_day_Temp + max_night_Temp) / 2, 2)
+    pic_average_EC = round((max_day_EC + max_night_EC) / 2, 2)
+
+    result = {
+        'max_day_SM': max_day_SM,
+        'max_night_SM': max_night_SM,
+        'pic_average_SM': pic_average_SM,
+
+        'max_day_Temp': max_day_Temp,
+        'max_night_Temp': max_night_Temp,
+        'pic_average_Temp': pic_average_Temp,
+
+        'max_day_EC': max_day_EC,
+        'max_night_EC': max_night_EC,
+        'pic_average_EC': pic_average_EC
+    }
+
+    return jsonify(result)
+
+
 
 # This endpoint is used to get an average by hour of the current day
 @sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/day/average', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC2DayAverage():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     current_date = datetime.datetime.now()
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensorSMTempEC2DayAverageValues = db.session.query(Sensor_SMTempEC_2).filter(Sensor_SMTempEC_2.datetime.like(f'%{formatted_date}%')).all()
@@ -69,7 +139,7 @@ def get_sensorSMTempEC2DayAverage():
 @sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/day', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC2ExtDay():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensors = db.session.query(Sensor_SMTempEC_2).filter(Sensor_SMTempEC_2.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
@@ -78,10 +148,10 @@ def get_sensorSMTempEC2ExtDay():
 @sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/week', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC2Week():
-    db = current_app.db
-    current_date = datetime.datetime.now()
-    start_date_week = current_date - datetime.timedelta(days=7)
-    end_date_week = current_date
+    offset = int(request.args.get('offset', 0))
+    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
+    start_date_week = now - datetime.timedelta(days=7)
+    end_date_week = now
 
     sensorSMTempEC2WeekValues = db.session.query(Sensor_SMTempEC_2).filter(
         Sensor_SMTempEC_2.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
@@ -124,7 +194,7 @@ def get_sensorSMTempEC2Week():
 @sensor_smtempec_2_app.route('/api/sensors/sensor_smtempec_2/month', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC2Month():
-    db = current_app.db
+    # utilise directement db.session.query(...)
     current_date = datetime.datetime.now()
     start_date_month = current_date - datetime.timedelta(days=30)
     
