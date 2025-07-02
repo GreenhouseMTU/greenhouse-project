@@ -30,7 +30,7 @@ function HighchartsSection({
         <div className="section-title">
           {type === 'light' ? 'Luminosity' : type === 'env' ? 'Environment' : 'Soil'}
         </div>
-        {getLastValueBlock(type)}
+        {getLastValueBlock(type, offset)}
       </div>
       <div className="section-chart">
         <div className="chart-controls">
@@ -53,6 +53,9 @@ function HighchartsSection({
             />
           )}
         </div>
+        <div className="chart-title" style={{ fontWeight: 700, fontSize: 20, color: '#40513B', marginBottom: 12 }}>
+          {getChartTitle(period[type])}
+        </div>
         <HighchartsReact
           highcharts={Highcharts}
           options={getChartOptions(
@@ -63,6 +66,23 @@ function HighchartsSection({
       </div>
     </div>
   );
+}
+
+function getChartTitle(period) {
+  switch (period) {
+    case 'full-day':
+      return 'All the values of the current day';
+    case 'day-average':
+      return 'Average by hour of the current day';
+    case 'week':
+      return 'Average per day of the values for a full week';
+    case 'month':
+      return '6 averaged values per day for a month';
+    case 'pic-average':
+      return 'Day/Night Average Values';
+    default:
+      return '';
+  }
 }
 
 export default HighchartsSection;

@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, current_app
-import datetime
+from datetime import datetime, timedelta, date, time
 from flask_jwt_extended import jwt_required
 from models import Sensor_CO2TempHum_int
 from db import db
 
 sensor_co2temphum_int_app = Blueprint('sensor_co2temphum_int_app', __name__)
 
-current_date = datetime.date.today()
+current_date = date.today()
 
 # This endpoint is used to get the latest values
 @sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/latest', methods=['GET'])
@@ -29,7 +29,7 @@ def get_sensorCO2TempHumInt():
 @jwt_required()
 def get_sensorCO2TempHumIntPicAverage():
     # utilise directement db.session.query(...)
-    now = datetime.datetime.now()
+    now = datetime.now()
     formatted_date = now.strftime('%Y-%m-%d')
 
     data_entries = db.session.query(Sensor_CO2TempHum_int).filter(Sensor_CO2TempHum_int.datetime.like(f'%{formatted_date}%')).all()
@@ -84,7 +84,7 @@ def get_sensorCO2TempHumIntPicAverage():
 @jwt_required()
 def get_sensorCO2TempHumIntDayAverage():
     # utilise directement db.session.query(...)
-    current_date = datetime.datetime.now()
+    current_date = datetime.now()
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensorCO2TempHumIntDayAverageValues = db.session.query(Sensor_CO2TempHum_int).filter(Sensor_CO2TempHum_int.datetime.like(f'%{formatted_date}%')).all()
 
@@ -133,48 +133,45 @@ def get_sensorCO2TempHumIntDay():
     sensors = db.session.query(Sensor_CO2TempHum_int).filter(Sensor_CO2TempHum_int.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
 
-# This endpoint is used to get an average by hour of the values for a week
+# This endpoint is used to get an average per day of the values for a full week (Monday to Sunday)
 @sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/week', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumIntWeek():
     offset = int(request.args.get('offset', 0))
-    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
-    start_date_week = now - datetime.timedelta(days=7)
-    end_date_week = now
+    today = datetime.now().date() + timedelta(days=offset * 7)
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    start_date = datetime.combine(monday, datetime.min.time())
+    end_date = datetime.combine(sunday, datetime.max.time())
 
-    sensorCO2TempHumIntWeekValues = db.session.query(Sensor_CO2TempHum_int).filter(
-        Sensor_CO2TempHum_int.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
-        Sensor_CO2TempHum_int.datetime <= end_date_week.strftime('%Y-%m-%d %H:%M:%S')
+    data_entries = db.session.query(Sensor_CO2TempHum_int).filter(
+        Sensor_CO2TempHum_int.datetime >= start_date,
+        Sensor_CO2TempHum_int.datetime <= end_date
     ).all()
 
-    hourly_avg_values = {}
-    for entry in sensorCO2TempHumIntWeekValues:
-        date = entry.datetime.strftime('%Y-%m-%d %H')  # get date and hour in the format 'YYYY-MM-DD HH'
-        valueCO2 = int(entry.valueCO2)
-        valueTemp = int(entry.valueTemp)
-        valueHum = int(entry.valueHum)
-        if date in hourly_avg_values:
-            hourly_avg_values[date]['valuesCO2'].append(valueCO2)
-            hourly_avg_values[date]['valuesTemp'].append(valueTemp)
-            hourly_avg_values[date]['valuesHum'].append(valueHum)
-        else:
-            hourly_avg_values[date] = {
-                'valuesCO2': [valueCO2],
-                'valuesTemp': [valueTemp],
-                'valuesHum': [valueHum]
-            }
+    daily_data = {}
+    for entry in data_entries:
+        date_str = entry.datetime.strftime('%Y-%m-%d')
+        if date_str not in daily_data:
+            daily_data[date_str] = {'CO2': [], 'Temp': [], 'Hum': []}
+        daily_data[date_str]['CO2'].append(int(entry.valueCO2))
+        daily_data[date_str]['Temp'].append(int(entry.valueTemp))
+        daily_data[date_str]['Hum'].append(int(entry.valueHum))
 
     results = []
-    for date, data in hourly_avg_values.items():
-        avg_valueCO2 = sum(data['valuesCO2']) / len(data['valuesCO2'])
-        avg_valueTemp = sum(data['valuesTemp']) / len(data['valuesTemp'])
-        avg_valueHum = sum(data['valuesHum']) / len(data['valuesHum'])
-        
+    for i in range(7):
+        current_date = monday + timedelta(days=i)
+        date_str = current_date.strftime('%Y-%m-%d')
+        values = daily_data.get(date_str, {'CO2': [], 'Temp': [], 'Hum': []})
+        avg_CO2 = round(sum(values['CO2']) / len(values['CO2']), 2) if values['CO2'] else 0
+        avg_Temp = round(sum(values['Temp']) / len(values['Temp']), 2) if values['Temp'] else 0
+        avg_Hum = round(sum(values['Hum']) / len(values['Hum']), 2) if values['Hum'] else 0
+
         results.append({
-            'date': date,
-            'average_valueCO2': round(avg_valueCO2, 2),
-            'average_valueTemp': round(avg_valueTemp, 2),
-            'average_valueHum': round(avg_valueHum, 2)
+            'date': date_str,
+            'average_valueCO2': avg_CO2,
+            'average_valueTemp': avg_Temp,
+            'average_valueHum': avg_Hum
         })
 
     return jsonify(results)
@@ -183,56 +180,55 @@ def get_sensorCO2TempHumIntWeek():
 @sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/month', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumIntMonth():
-    # utilise directement db.session.query(...)
-    current_date = datetime.datetime.now()
-    start_date_month = current_date - datetime.timedelta(days=30)
+    current_date = datetime.now()
+    start_date_month = current_date - timedelta(days=30)
     
     sensorCO2TempHumIntMonthValues = db.session.query(Sensor_CO2TempHum_int).filter(
-        Sensor_CO2TempHum_int.datetime >= start_date_month.strftime('%Y-%m-%d %H:%M:%S'),
-        Sensor_CO2TempHum_int.datetime <= current_date.strftime('%Y-%m-%d %H:%M:%S')
+        Sensor_CO2TempHum_int.datetime >= start_date_month,
+        Sensor_CO2TempHum_int.datetime <= current_date
     ).all()
 
     daily_avg_values = {}
     for entry in sensorCO2TempHumIntMonthValues:
-        date = entry.datetime.date()  
-        valueCO2 = int(entry.valueCO2)
-        valueTemp = int(entry.valueTemp)
-        valueHum = int(entry.valueHum)
-        if date in daily_avg_values:
-            daily_avg_values[date]['valuesCO2'].append(valueCO2)
-            daily_avg_values[date]['valuesTemp'].append(valueTemp)
-            daily_avg_values[date]['valuesHum'].append(valueHum)
-        else:
-            daily_avg_values[date] = {
-                'valuesCO2': [valueCO2],
-                'valuesTemp': [valueTemp],
-                'valuesHum': [valueHum]
+        entry_date = entry.datetime.date()
+        if entry_date not in daily_avg_values:
+            daily_avg_values[entry_date] = {
+                'valuesCO2': [],
+                'valuesTemp': [],
+                'valuesHum': []
             }
+        daily_avg_values[entry_date]['valuesCO2'].append(int(entry.valueCO2))
+        daily_avg_values[entry_date]['valuesTemp'].append(int(entry.valueTemp))
+        daily_avg_values[entry_date]['valuesHum'].append(int(entry.valueHum))
 
     # Intervals definition
     part_intervals = [(0, 3, 59, 59), (4, 7, 59, 59), (8, 11, 59, 59), (12, 15, 59, 59), (16, 19, 59, 59), (20, 23, 59, 59)]
 
+
     results = []
-    for date, data in daily_avg_values.items():
-        avg_parts = []
-
+    for entry_date in daily_avg_values:
         for start_hour, end_hour, end_minute, end_second in part_intervals:
-            part_values = [val for val in sensorCO2TempHumIntMonthValues if start_hour <= val.datetime.hour <= end_hour and val.datetime.date() == date]
-            part_values = [int(entry.valueCO2) for entry in part_values]
-            if part_values:
-                part_avg_value = sum(part_values) / len(part_values)
-                part_date = datetime.datetime.combine(date, datetime.time(start_hour, end_minute, end_second))
-                avg_parts.append({'date': part_date.strftime('%Y-%m-%d %H:%M:%S'), 'average_valueCO2': round(part_avg_value, 2)})
+            start_time = time(start_hour, 0, 0)
+            end_time = time(end_hour, end_minute, end_second)
 
-                part_valuesTemp = [int(entry.valueTemp) for entry in part_values]
-                part_avg_valueTemp = sum(part_valuesTemp) / len(part_valuesTemp)
-                avg_parts[-1]['average_valueTemp'] = round(part_avg_valueTemp, 2)
+            part_entries = [
+                entry for entry in sensorCO2TempHumIntMonthValues
+                if entry.datetime.date() == entry_date and start_time <= entry.datetime.time() <= end_time
+            ]
 
-                part_valuesHum = [int(entry.valueHum) for entry in part_values]
-                part_avg_valueHum = sum(part_valuesHum) / len(part_valuesHum)
-                avg_parts[-1]['average_valueHum'] = round(part_avg_valueHum, 2)
+            if part_entries:
+                avg_CO2 = round(sum(int(e.valueCO2) for e in part_entries) / len(part_entries), 2)
+                avg_Temp = round(sum(int(e.valueTemp) for e in part_entries) / len(part_entries), 2)
+                avg_Hum = round(sum(int(e.valueHum) for e in part_entries) / len(part_entries), 2)
 
-        results.extend(avg_parts)
+                part_date = datetime.combine(entry_date, start_time)
+
+                results.append({
+                    'date': part_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'average_valueCO2': avg_CO2,
+                    'average_valueTemp': avg_Temp,
+                    'average_valueHum': avg_Hum
+                })
 
     return jsonify(results)
 

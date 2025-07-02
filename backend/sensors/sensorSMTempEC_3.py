@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, current_app
-import datetime
+from datetime import datetime, timedelta, date, time
 from flask_jwt_extended import jwt_required
 from models import Sensor_SMTempEC_3
 from db import db
 
 sensor_smtempec_3_app = Blueprint('sensor_smtempec_3_app', __name__)
 
-current_date = datetime.date.today()
+current_date = date.today()
 
 # This endpoint is used to get the latest value
 @sensor_smtempec_3_app.route('/api/sensors/sensor_smtempec_3/latest', methods=['GET'])
@@ -29,7 +29,7 @@ def get_sensorSMTempEC3():
 @jwt_required()
 def get_sensorSMTempEC3PicAverage():
     # utilise directement db.session.query(...)
-    now = datetime.datetime.now()
+    now = datetime.now()
     formatted_date = now.strftime('%Y-%m-%d')
 
     data_entries = db.session.query(Sensor_SMTempEC_3).filter(Sensor_SMTempEC_3.datetime.like(f'%{formatted_date}%')).all()
@@ -91,7 +91,7 @@ def get_sensorSMTempEC3PicAverage():
 @jwt_required()
 def get_sensorSMTempEC3DayAverage():
     # utilise directement db.session.query(...)
-    current_date = datetime.datetime.now()
+    current_date = datetime.now()
     formatted_date = current_date.strftime('%Y-%m-%d')
     sensorSMTempEC3DayAverageValues = db.session.query(Sensor_SMTempEC_3).filter(Sensor_SMTempEC_3.datetime.like(f'%{formatted_date}%')).all()
 
@@ -140,48 +140,45 @@ def get_sensorSMTempEC3ExtDay():
     sensors = db.session.query(Sensor_SMTempEC_3).filter(Sensor_SMTempEC_3.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
 
-# This endpoint is used to get an average by hour of the values for a week
+# This endpoint is used to get an average per day of the values for a full week (Monday to Sunday)
 @sensor_smtempec_3_app.route('/api/sensors/sensor_smtempec_3/week', methods=['GET'])
 @jwt_required()
 def get_sensorSMTempEC3Week():
     offset = int(request.args.get('offset', 0))
-    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
-    start_date_week = now - datetime.timedelta(days=7)
-    end_date_week = now
+    today = datetime.now().date() + timedelta(days=offset * 7)
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    start_date = datetime.combine(monday, datetime.min.time())
+    end_date = datetime.combine(sunday, datetime.max.time())
 
-    sensorSMTempEC3WeekValues = db.session.query(Sensor_SMTempEC_3).filter(
-        Sensor_SMTempEC_3.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
-        Sensor_SMTempEC_3.datetime <= end_date_week.strftime('%Y-%m-%d %H:%M:%S')
+    data_entries = db.session.query(Sensor_SMTempEC_3).filter(
+        Sensor_SMTempEC_3.datetime >= start_date,
+        Sensor_SMTempEC_3.datetime <= end_date
     ).all()
 
-    hourly_avg_values = {}
-    for entry in sensorSMTempEC3WeekValues:
-        date = entry.datetime.strftime('%Y-%m-%d %H')  
-        valueSM = int(entry.valueSM)
-        valueTemp = int(entry.valueTemp)
-        valueEC = int(entry.valueEC)
-        if date in hourly_avg_values:
-            hourly_avg_values[date]['valuesSM'].append(valueSM)
-            hourly_avg_values[date]['valuesTemp'].append(valueTemp)
-            hourly_avg_values[date]['valuesEC'].append(valueEC)
-        else:
-            hourly_avg_values[date] = {
-                'valuesSM': [valueSM],
-                'valuesTemp': [valueTemp],
-                'valuesEC': [valueEC]
-            }
+    daily_data = {}
+    for entry in data_entries:
+        date_str = entry.datetime.strftime('%Y-%m-%d')
+        if date_str not in daily_data:
+            daily_data[date_str] = {'SM': [], 'Temp': [], 'EC': []}
+        daily_data[date_str]['SM'].append(int(entry.valueSM))
+        daily_data[date_str]['Temp'].append(int(entry.valueTemp))
+        daily_data[date_str]['EC'].append(int(entry.valueEC))
 
     results = []
-    for date, data in hourly_avg_values.items():
-        avg_valueSM = sum(data['valuesSM']) / len(data['valuesSM'])
-        avg_valueTemp = sum(data['valuesTemp']) / len(data['valuesTemp'])
-        avg_valueEC = sum(data['valuesEC']) / len(data['valuesEC'])
-        
+    for i in range(7):
+        current_date = monday + timedelta(days=i)
+        date_str = current_date.strftime('%Y-%m-%d')
+        values = daily_data.get(date_str, {'SM': [], 'Temp': [], 'EC': []})
+        avg_SM = round(sum(values['SM']) / len(values['SM']), 2) if values['SM'] else 0
+        avg_Temp = round(sum(values['Temp']) / len(values['Temp']), 2) if values['Temp'] else 0
+        avg_EC = round(sum(values['EC']) / len(values['EC']), 2) if values['EC'] else 0
+
         results.append({
-            'date': date,
-            'average_valueSM': round(avg_valueSM, 2),
-            'average_valueTemp': round(avg_valueTemp, 2),
-            'average_valueEC': round(avg_valueEC, 2)
+            'date': date_str,
+            'average_valueSM': avg_SM,
+            'average_valueTemp': avg_Temp,
+            'average_valueEC': avg_EC
         })
 
     return jsonify(results)
@@ -191,9 +188,9 @@ def get_sensorSMTempEC3Week():
 @jwt_required()
 def get_sensorSMTempEC3Month():
     # utilise directement db.session.query(...)
-    current_date = datetime.datetime.now()
-    start_date_month = current_date - datetime.timedelta(days=30)
-    
+    current_date = datetime.now()
+    start_date_month = current_date - timedelta(days=30)
+
     sensorSMTempEC3MonthValues = db.session.query(Sensor_SMTempEC_3).filter(
         Sensor_SMTempEC_3.datetime >= start_date_month.strftime('%Y-%m-%d %H:%M:%S'),
         Sensor_SMTempEC_3.datetime <= current_date.strftime('%Y-%m-%d %H:%M:%S')
@@ -228,7 +225,7 @@ def get_sensorSMTempEC3Month():
             part_values = [int(entry.valueSM) for entry in part_values]
             if part_values:
                 part_avg_value = sum(part_values) / len(part_values)
-                part_date = datetime.datetime.combine(date, datetime.time(start_hour, end_minute, end_second))
+                part_date = datetime.combine(date, time(start_hour, end_minute, end_second))
                 avg_parts.append({'date': part_date.strftime('%Y-%m-%d %H:%M:%S'), 'average_valueSM': round(part_avg_value, 2)})
 
                 part_valuesTemp = [int(entry.valueTemp) for entry in part_values]

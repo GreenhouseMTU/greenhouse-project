@@ -1,12 +1,12 @@
 from flask import Blueprint, request, jsonify, current_app
-import datetime
+from datetime import datetime, timedelta, date, time
 from flask_jwt_extended import jwt_required
 from models import Sensor_light_ext
 from db import db
 
 sensor_light_ext_app = Blueprint('sensor_light_ext_app', __name__)
 
-current_date = datetime.date.today()
+current_date = date.today()
 
 
 # This endpoint is used to get the latest value
@@ -29,7 +29,7 @@ def get_sensorLightExt():
 @jwt_required()
 def get_sensorLightExtPicAverage():
     # utilise directement db.session.query(...)
-    now = datetime.datetime.now()
+    now = datetime.now()
     formatted_date = now.strftime('%Y-%m-%d')
 
     data_entries = db.session.query(Sensor_light_ext).filter(Sensor_light_ext.datetime.like(f'%{formatted_date}%')).all()
@@ -97,41 +97,36 @@ def get_sensorLightExtDay():
     sensors = db.session.query(Sensor_light_ext).filter(Sensor_light_ext.datetime.like(f'%{formatted_date}%')).all()
     return jsonify([sensor.serialize() for sensor in sensors])
 
-# This endpoint is used to get an average by hour of the values for a week
+# This endpoint is used to get an average per day of the values for a full week (Monday to Sunday)
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/week', methods=['GET'])
 @jwt_required()
 def get_sensorLightExtWeek():
     offset = int(request.args.get('offset', 0))
-    now = datetime.datetime.now() + datetime.timedelta(days=offset * 7)
-    start_date_week = now - datetime.timedelta(days=7)
-    end_date_week = now
+    today = datetime.now().date() + timedelta(days=offset * 7)
+    monday = today - timedelta(days=today.weekday())
+    sunday = monday + timedelta(days=6)
+    start_date = datetime.combine(monday, datetime.min.time())
+    end_date = datetime.combine(sunday, datetime.max.time())
 
-    sensorLightExtWeekValues = db.session.query(Sensor_light_ext).filter(
-        Sensor_light_ext.datetime >= start_date_week.strftime('%Y-%m-%d %H:%M:%S'),
-        Sensor_light_ext.datetime <= end_date_week.strftime('%Y-%m-%d %H:%M:%S')
+    data_entries = db.session.query(Sensor_light_ext).filter(
+        Sensor_light_ext.datetime >= start_date,
+        Sensor_light_ext.datetime <= end_date
     ).all()
 
-    hourly_avg_values = {}  # Store hourly average values here
-
-    for entry in sensorLightExtWeekValues:
-        hour = entry.datetime.hour  # Get the hour of the data point
-        value = int(entry.value)
-
-        if hour in hourly_avg_values:
-            hourly_avg_values[hour]['values'].append(value)
-        else:
-            hourly_avg_values[hour] = {'values': [value]}
+    daily_data = {}
+    for entry in data_entries:
+        date_str = entry.datetime.strftime('%Y-%m-%d')
+        if date_str not in daily_data:
+            daily_data[date_str] = {'values': []}
+        daily_data[date_str]['values'].append(int(entry.value))
 
     results = []
-
-    for hour, data in hourly_avg_values.items():
-        avg_value = sum(data['values']) / len(data['values'])
-        avg_value_rounded = round(avg_value, 2)
-
-        # Create a datetime object for the hour
-        hour_datetime = datetime.datetime(end_date_week.year, end_date_week.month, end_date_week.day, hour)
-
-        results.append({'hour': hour_datetime.strftime('%Y-%m-%d %H:%M:%S'), 'average_value': avg_value_rounded})
+    for i in range(7):
+        current_date = monday + timedelta(days=i)
+        date_str = current_date.strftime('%Y-%m-%d')
+        values = daily_data.get(date_str, {}).get('values', [])
+        avg_value = round(sum(values) / len(values), 2) if values else 0
+        results.append({'date': date_str, 'average_value': avg_value})
 
     return jsonify(results)
 
@@ -140,8 +135,8 @@ def get_sensorLightExtWeek():
 @jwt_required()
 def get_sensorLightExtMonthAverage():
     # utilise directement db.session.query(...)
-    end_date_month = datetime.datetime.now()
-    start_date_month = end_date_month - datetime.timedelta(days=30)
+    end_date_month = datetime.now()
+    start_date_month = end_date_month - timedelta(days=30)
     
     sensorLightExtMonthValues = db.session.query(Sensor_light_ext).filter(
         Sensor_light_ext.datetime >= start_date_month.strftime('%Y-%m-%d %H:%M:%S'),
@@ -169,7 +164,7 @@ def get_sensorLightExtMonthAverage():
             part_values = [int(entry.value) for entry in part_values]
             if part_values:
                 part_avg_value = sum(part_values) / len(part_values)
-                part_date = datetime.datetime.combine(date, datetime.time(start_hour, end_minute, end_second))
+                part_date = datetime.combine(date, time(start_hour, end_minute, end_second))
                 avg_parts.append({'date': part_date.strftime('%Y-%m-%d %H:%M:%S'), 'average_value': round(part_avg_value, 2)})
 
         results.extend(avg_parts)

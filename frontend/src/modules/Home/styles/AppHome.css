@@ -186,20 +186,27 @@ button:hover {
   background: transparent; /* S'assure qu'il n'y a pas de fond */
 }
 
+
+.section-divider {
+  border-bottom: 2px solid #9DC08B;
+  width: 60%;           /* Ajuste la largeur selon ton besoin */
+  margin: 40px auto;    /* Centre le trait et ajoute de l'espace autour */
+}
+
 .section-values {
   flex: 1;
   text-align: center;
   min-width: 220px;
   align-self: stretch;
-  padding-top: 30px;
+  padding-top: -10px;
   background: #EDF1D6;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  border-bottom: 1px solid #9DC08B; /* Ajoute le trait ici */
 }
 
 .section-chart {
+  margin-top: 20px; /* Ajuste la valeur selon le décalage souhaité */
   flex: 2;
   display: flex;
   flex-direction: column;
@@ -208,7 +215,7 @@ button:hover {
   background: transparent; /* Enlève le fond blanc */
   justify-content: center;
   padding-right: 16px; /* Décale le graphe du bord droit */
-  padding-bottom: 140px; /* Beaucoup plus d'espace pour l'axe X */
+  padding-bottom: 80px; /* Beaucoup plus d'espace pour l'axe X */
   position: relative;
   overflow: visible;
 }
@@ -219,6 +226,14 @@ button:hover {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.chart-title {
+  font-weight: 700;
+  font-size: 20px;
+  color: #40513B;
+  margin-bottom: 12px;
+  text-align: center;
 }
 
 .week-controls {
