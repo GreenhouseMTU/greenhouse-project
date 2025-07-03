@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HighchartsSection from './HighchartsSection';
 import '../styles/AppHome.css';
@@ -20,6 +20,7 @@ const DATA_MODES = [
   { value: '3', label: 'Sensor 3' },
   { value: '4', label: 'Sensor 4' },
 ];
+
 
 // Composant pour navigation semaine/mois
 function PeriodNav({ periodType, offset, setOffset, label }) {
@@ -57,6 +58,8 @@ function Dashboard() {
   // Offsets pour chaque section et chaque période
   const [weekOffset, setWeekOffset] = useState({ light: 0, env: 0, soil: 0 });
   const [monthOffset, setMonthOffset] = useState({ light: 0, env: 0, soil: 0 });
+
+  const scrollPosition = useRef(0);
 
   const endpointMap = {
     light: {
@@ -138,6 +141,7 @@ function Dashboard() {
   };
 
   useEffect(() => {
+    scrollPosition.current = window.scrollY;
     const fetchAll = async () => {
       setLoading(true);
       setErrorMessage('');
@@ -207,6 +211,13 @@ function Dashboard() {
     navigate
   ]);
 
+  // Ajoute ce useEffect pour restaurer la position après chargement :
+  useEffect(() => {
+    if (!loading) {
+      window.scrollTo({ top: scrollPosition.current, behavior: 'auto' });
+    }
+  }, [loading]);
+  
   function handlePeriodChange(section, value, offset = 0) {
     setPeriod(prev => ({ ...prev, [section]: value }));
     if (value === 'week') {
@@ -239,8 +250,9 @@ function Dashboard() {
   const getMonthLabel = (offset) => {
     const now = new Date();
     now.setMonth(now.getMonth() + offset);
-    return `Month (${now.toLocaleString('fr-FR', { month: 'long', year: 'numeric' })})`;
-  }
+    // Utilise 'en-US' pour l'anglais
+    return `Month (${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })})`;
+  };
 
   const formatLux = (value) => {
     if (value === undefined || value === null || value === 'N/A') return 'N/A';
@@ -329,7 +341,7 @@ function Dashboard() {
               arr.find(s => s.mode === mode)?.data || [],
               offset
             );
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -391,7 +403,7 @@ function Dashboard() {
               arr.find(s => s.mode === mode)?.data || [],
               offset
             );
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -450,7 +462,7 @@ function Dashboard() {
           );
         } else if (['1', '2', '3', '4'].includes(mode)) {
           const data = filterDataByMonthOffset(arr[0]?.data || [], offset);
-          const labelColor = '#609966';
+          const labelColor = '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -503,7 +515,7 @@ function Dashboard() {
           );
         } else if (['ext', 'int'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -562,7 +574,7 @@ function Dashboard() {
           );
         } else if (['ext', 'int'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -621,7 +633,7 @@ function Dashboard() {
           );
         } else if (['1', '2', '3', '4'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = '#609966';
+          const labelColor = '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -646,8 +658,9 @@ function Dashboard() {
     }
 
     // FULL-DAY and PIC-AVERAGE
-    // Ajoute le titre dynamique ici aussi pour chaque bloc
-    if (period[type] === 'full-day' || period[type] === 'pic-average') {
+    
+    // FULL-DAY
+    if (period[type] === 'full-day') {
       if (type === 'light') {
         const ext = arr.find(s => s.mode === 'ext')?.data;
         const int = arr.find(s => s.mode === 'int')?.data;
@@ -675,7 +688,7 @@ function Dashboard() {
           );
         } else if (['ext', 'int'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -734,7 +747,7 @@ function Dashboard() {
           );
         } else if (['ext', 'int'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#609966' : '#40513B';
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -793,7 +806,7 @@ function Dashboard() {
           );
         } else if (['1', '2', '3', '4'].includes(mode)) {
           const data = arr[0]?.data;
-          const labelColor = '#609966';
+          const labelColor = '#40513B';
           return (
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
@@ -811,6 +824,176 @@ function Dashboard() {
                 {data && data.length ? `${data[data.length - 1].valueEC} mS/cm` : 'N/A'}
               </div>
               <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC (Sensor {mode})</div>
+            </div>
+          );
+        }
+      }
+    }
+    // PIC-AVERAGE
+    if (period[type] === 'pic-average') {
+      if (type === 'light') {
+        const ext = arr.find(s => s.mode === 'ext')?.data;
+        const int = arr.find(s => s.mode === 'int')?.data;
+        if (mode === 'all') {
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {formatLux(ext && ext.length ? ext[0].pic_average : 'N/A')}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Ext Lum Avg</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {formatLux(int && int.length ? int[0].pic_average : 'N/A')}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Int Lum Avg</div>
+                </div>
+              </div>
+            </div>
+          );
+        } else if (['ext', 'int'].includes(mode)) {
+          const data = arr[0]?.data;
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {formatLux(data && data.length ? data[0].pic_average : 'N/A')}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>
+                {mode === 'ext' ? 'Ext Lum Avg' : 'Int Lum Avg'}
+              </div>
+            </div>
+          );
+        }
+      }
+      if (type === 'env') {
+        const ext = arr.find(s => s.mode === 'ext')?.data;
+        const int = arr.find(s => s.mode === 'int')?.data;
+        if (mode === 'all') {
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {ext && ext.length ? `${ext[0].pic_average_Temp} °C` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {ext && ext.length ? `${ext[0].pic_average_Hum} %` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {ext && ext.length ? `${ext[0].pic_average_CO2} ppm` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂ Avg</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {int && int.length ? `${int[0].pic_average_Temp} °C` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {int && int.length ? `${int[0].pic_average_Hum} %` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                    {int && int.length ? `${int[0].pic_average_CO2} ppm` : 'N/A'}
+                  </div>
+                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂ Avg</div>
+                </div>
+              </div>
+            </div>
+          );
+        } else if (['ext', 'int'].includes(mode)) {
+          const data = arr[0]?.data;
+          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp Avg</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_Hum} %` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum Avg</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_CO2} ppm` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>CO₂ Avg</div>
+            </div>
+          );
+        }
+      }
+      if (type === 'soil') {
+        if (mode === 'all') {
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'flex-start' }}>
+                {['1', '2', '3', '4'].map((sensor, index) => {
+                  const data = arr.find(s => s.mode === sensor)?.data;
+                  return (
+                    <React.Fragment key={sensor}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                          {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                          {data && data.length ? `${data[0].pic_average_SM} %` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
+                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
+                          {data && data.length ? `${data[0].pic_average_EC} mS/cm` : 'N/A'}
+                        </div>
+                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>EC Avg ({sensor})</div>
+                      </div>
+                      {index < 3 && (
+                        <div style={{ fontSize: 32, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        } else if (['1', '2', '3', '4'].includes(mode)) {
+          const data = arr[0]?.data;
+          const labelColor = '#40513B';
+          return (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
+                {getValuesTitle(period[type], type)}
+              </div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp Avg</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_SM} %` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum Avg</div>
+              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
+                {data && data.length ? `${data[0].pic_average_EC} mS/cm` : 'N/A'}
+              </div>
+              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC Avg (Sensor {mode})</div>
             </div>
           );
         }
@@ -896,59 +1079,66 @@ function Dashboard() {
       );
     }
 
+    // Définir les couleurs pour les capteurs (dégradé du noir au vert)
+    const colorMap = {
+      light: ['#000000', '#9DC08B'], // ext: noir, int: vert
+      env: ['#000000', '#9DC08B'],   // ext: noir, int: vert
+      soil: ['#000000', '#333333', '#666666', '#9DC08B'] // Sensor 1: noir, Sensor 2: gris foncé, Sensor 3: gris moyen, Sensor 4: vert
+    };
+
     // FULL-DAY
     if (period[type] === 'full-day') {
       if (mode === 'all') {
-        arr.forEach(({ mode: m, data }) => {
+        arr.forEach(({ mode: m, data }, index) => {
           if (type === 'light') {
             series.push({
-              name: m === 'ext' ? 'Ext Lum' : 'Int Lum',
+              name: `Lum ${m}`,
               data: data.map(item => [getTimestamp(item.datetime), item.value || null]),
-              color: m === 'ext' ? '#F9B233' : '#40513B'
+              color: colorMap.light[index]
             });
           }
           if (type === 'env') {
             series.push(
               {
-                name: m === 'ext' ? 'Ext CO2' : 'Int CO2',
+                name: `${m} CO2`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueCO2 || null]),
-                color: m === 'ext' ? '#FF0000' : '#B22222',
+                color: colorMap.env[index],
                 yAxis: 0
               },
               {
-                name: m === 'ext' ? 'Ext Temp' : 'Int Temp',
+                name: `${m} Temp`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
-                color: m === 'ext' ? '#609966' : '#B0C4DE',
+                color: colorMap.env[index],
                 yAxis: 1
               },
               {
-                name: m === 'ext' ? 'Ext Hum' : 'Int Hum',
+                name: `${m} Hum`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueHum || null]),
-                color: m === 'ext' ? '#0000FF' : '#8A2BE2',
+                color: colorMap.env[index],
                 yAxis: 2
               }
             );
           }
           if (type === 'soil') {
-            const colorMap = { '1': '#FFA500', '2': '#00CED1', '3': '#FF69B4', '4': '#808080' };
             if (['1', '2', '3', '4'].includes(m)) {
+              const soilIndex = parseInt(m) - 1;
               series.push(
                 {
                   name: `Soil ${m} Hum`,
                   data: data.map(item => [getTimestamp(item.datetime), item.valueSM || null]),
-                  color: colorMap[m],
+                  color: colorMap.soil[soilIndex],
                   yAxis: 0
                 },
                 {
                   name: `Soil ${m} Temp`,
                   data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
-                  color: colorMap[m],
+                  color: colorMap.soil[soilIndex],
                   yAxis: 1
                 },
                 {
                   name: `Soil ${m} EC`,
                   data: data.map(item => [getTimestamp(item.datetime), item.valueEC || null]),
-                  color: colorMap[m],
+                  color: colorMap.soil[soilIndex],
                   yAxis: 2
                 }
               );
@@ -961,11 +1151,12 @@ function Dashboard() {
         (type === 'soil' && ['1', '2', '3', '4'].includes(mode))
       ) {
         const data = arr[0]?.data || [];
+        const index = type === 'soil' ? parseInt(mode) - 1 : (mode === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
-            name: mode === 'ext' ? 'Ext Lum' : 'Int Lum',
+            name: `Lum ${mode}`,
             data: data.map(item => [getTimestamp(item.datetime), item.value || null]),
-            color: mode === 'ext' ? '#F9B233' : '#40513B'
+            color: colorMap.light[index]
           });
         }
         if (type === 'env') {
@@ -973,19 +1164,19 @@ function Dashboard() {
             {
               name: 'CO2',
               data: data.map(item => [getTimestamp(item.datetime), item.valueCO2 || null]),
-              color: '#FF0000',
+              color: colorMap.env[index],
               yAxis: 0
             },
             {
               name: 'Temp',
               data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
-              color: '#609966',
+              color: colorMap.env[index],
               yAxis: 1
             },
             {
               name: 'Hum',
               data: data.map(item => [getTimestamp(item.datetime), item.valueHum || null]),
-              color: '#0000FF',
+              color: colorMap.env[index],
               yAxis: 2
             }
           );
@@ -993,21 +1184,21 @@ function Dashboard() {
         if (type === 'soil') {
           series.push(
             {
-              name: 'Hum',
+              name: `Soil ${mode} Hum`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueSM || null]),
-              color: '#0000FF',
+              color: colorMap.soil[index],
               yAxis: 0
             },
             {
-              name: 'Temp',
+              name: `Soil ${mode} Temp`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
-              color: '#609966',
+              color: colorMap.soil[index],
               yAxis: 1
             },
             {
-              name: 'EC',
+              name: `Soil ${mode} EC`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueEC || null]),
-              color: '#FF0000',
+              color: colorMap.soil[index],
               yAxis: 2
             }
           );
@@ -1057,7 +1248,7 @@ function Dashboard() {
       const weekDates = getWeekDates(offset);
       categories = weekDates;
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      datasets.forEach(({ mode: m, data }) => {
+      datasets.forEach(({ mode: m, data }, index) => {
         const valueMap = {};
         data.forEach(item => {
           const date = (item.date || '').slice(0, 10);
@@ -1077,62 +1268,65 @@ function Dashboard() {
         });
         if (type === 'light') {
           series.push({
-            name: m === 'ext' ? 'Ext Lum' : 'Int Lum',
+            name: `Lum ${m}`,
             data: weekDates.map(date => valueMap[date] ?? null),
+            color: colorMap.light[index],
             marker: { enabled: true }
           });
         }
         if (type === 'env') {
           series.push(
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'CO2',
+              name: `${m} CO2`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].CO2 : null)),
-              color: m === 'ext' ? '#FF0000' : '#B22222',
+              color: colorMap.env[index],
               yAxis: 0,
               marker: { enabled: true }
             },
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'Temp',
+              name: `${m} Temp`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
-              color: m === 'ext' ? '#609966' : '#B0C4DE',
+              color: colorMap.env[index],
               yAxis: 1,
               marker: { enabled: true }
             },
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'Hum',
+              name: `${m} Hum`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].Hum : null)),
-              color: m === 'ext' ? '#0000FF' : '#8A2BE2',
+              color: colorMap.env[index],
               yAxis: 2,
               marker: { enabled: true }
             }
           );
         }
         if (type === 'soil') {
+          const soilIndex = parseInt(m) - 1;
           series.push(
             {
               name: `Soil ${m} Hum`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].SM : null)),
-              color: '#0000FF',
+              color: colorMap.soil[soilIndex],
               yAxis: 0,
               marker: { enabled: true }
             },
             {
               name: `Soil ${m} Temp`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
-              color: '#609966',
+              color: colorMap.soil[soilIndex],
               yAxis: 1,
               marker: { enabled: true }
             },
             {
               name: `Soil ${m} EC`,
               data: weekDates.map(date => (valueMap[date] ? valueMap[date].EC : null)),
-              color: '#FF0000',
+              color: colorMap.soil[soilIndex],
               yAxis: 2,
               marker: { enabled: true }
             }
           );
         }
       });
+
       return {
         chart: { type: 'line', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
         title: { text: null },
@@ -1160,84 +1354,79 @@ function Dashboard() {
 
     // MONTH
     if (period[type] === 'month') {
-      const monthDates = getMonthDates(offset);
-      categories = monthDates;
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      datasets.forEach(({ mode: m, data }) => {
-        const valueMap = {};
-        data.forEach(item => {
-          const date = (item.date || '').slice(0, 10);
-          if (type === 'light') valueMap[date] = item.average_value ?? item.value ?? null;
-          if (type === 'env') {
-            if (!valueMap[date]) valueMap[date] = {};
-            valueMap[date].CO2 = item.average_valueCO2 ?? item.valueCO2 ?? null;
-            valueMap[date].Temp = item.average_valueTemp ?? item.valueTemp ?? null;
-            valueMap[date].Hum = item.average_valueHum ?? item.valueHum ?? null;
-          }
-          if (type === 'soil') {
-            if (!valueMap[date]) valueMap[date] = {};
-            valueMap[date].SM = item.average_valueSM ?? item.valueSM ?? null;
-            valueMap[date].Temp = item.average_valueTemp ?? item.valueTemp ?? null;
-            valueMap[date].EC = item.average_valueEC ?? item.valueEC ?? null;
-          }
-        });
+      series = [];
 
+      const now = new Date();
+      now.setMonth(now.getMonth() + offset);
+      const year = now.getFullYear();
+      const month = now.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const minDate = firstDay.getTime();
+      const maxDate = lastDay.getTime();
+
+      datasets.forEach(({ mode: m, data }, index) => {
         if (type === 'light') {
           series.push({
-            name: m === 'ext' ? 'Ext Lum' : 'Int Lum',
-            data: monthDates.map(date => valueMap[date] ?? null),
+            name: `Lum ${m}`,
+            data: data.map(item => [getTimestamp(item.date), item.average_value || null]),
+            color: colorMap.light[index],
             marker: { enabled: true }
           });
         }
         if (type === 'env') {
           series.push(
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'CO2',
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].CO2 : null)),
-              color: m === 'ext' ? '#FF0000' : '#B22222',
+              name: `${m} CO2`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueCO2 || null]),
+              color: colorMap.env[index],
               yAxis: 0,
               marker: { enabled: true }
             },
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'Temp',
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
-              color: m === 'ext' ? '#609966' : '#B0C4DE',
+              name: `${m} Temp`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueTemp || null]),
+              color: colorMap.env[index],
               yAxis: 1,
               marker: { enabled: true }
             },
             {
-              name: (m === 'ext' ? 'Ext ' : 'Int ') + 'Hum',
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].Hum : null)),
-              color: m === 'ext' ? '#0000FF' : '#8A2BE2',
+              name: `${m} Hum`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueHum || null]),
+              color: colorMap.env[index],
               yAxis: 2,
               marker: { enabled: true }
             }
           );
         }
         if (type === 'soil') {
-          series.push(
-            {
-              name: `Soil ${m} Hum`,
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].SM : null)),
-              color: '#0000FF',
-              yAxis: 0,
-              marker: { enabled: true }
-            },
-            {
-              name: `Soil ${m} Temp`,
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
-              color: '#609966',
-              yAxis: 1,
-              marker: { enabled: true }
-            },
-            {
-              name: `Soil ${m} EC`,
-              data: monthDates.map(date => (valueMap[date] ? valueMap[date].EC : null)),
-              color: '#FF0000',
-              yAxis: 2,
-              marker: { enabled: true }
-            }
-          );
+          const soilIndex = parseInt(m) - 1;
+          if (['1', '2', '3', '4'].includes(m)) {
+            series.push(
+              {
+                name: `Soil ${m} Hum`,
+                data: data.map(item => [getTimestamp(item.date), item.average_valueSM || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 0,
+                marker: { enabled: true }
+              },
+              {
+                name: `Soil ${m} Temp`,
+                data: data.map(item => [getTimestamp(item.date), item.average_valueTemp || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 1,
+                marker: { enabled: true }
+              },
+              {
+                name: `Soil ${m} EC`,
+                data: data.map(item => [getTimestamp(item.date), item.average_valueEC || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 2,
+                marker: { enabled: true }
+              }
+            );
+          }
         }
       });
 
@@ -1251,9 +1440,20 @@ function Dashboard() {
         },
         title: { text: null },
         xAxis: {
-          categories,
+          type: 'datetime',
+          min: minDate,
+          max: maxDate,
           title: { text: 'Date', style: { fontSize: '14px' } },
-          labels: { rotation: -45, style: { fontSize: '12px' }, y: 25, enabled: true },
+          labels: {
+            style: { fontSize: '12px' },
+            rotation: -45,
+            y: 25,
+            step: 2
+          },
+          dateTimeLabelFormats: {
+            day: '%e/%m',
+            hour: '%e/%m %H:%M'
+          },
           scrollbar: { enabled: true }
         },
         yAxis: type === 'light' ? {
@@ -1270,6 +1470,7 @@ function Dashboard() {
         ],
         legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
         tooltip: {
+          xDateFormat: '%Y-%m-%d %H:%M:%S',
           shared: true
         },
         series,
@@ -1278,41 +1479,61 @@ function Dashboard() {
       };
     }
 
-
     // DAY-AVERAGE
     if (period[type] === 'day-average') {
       if (mode === 'all') {
-        arr.forEach(({ mode: m, data }) => {
+        arr.forEach(({ mode: m, data }, index) => {
           if (type === 'light') {
             series.push({
-              name: m === 'ext' ? 'Ext Lum' : 'Int Lum',
+              name: `Lum ${m}`,
               data: data.map(item => item.average_value || item.value || 0),
-              color: m === 'ext' ? '#F9B233' : '#40513B'
+              color: colorMap.light[index]
             });
           }
           if (type === 'env') {
-            if (m === 'ext') {
-              series.push(
-                { name: 'Ext CO2', data: data.map(item => item.average_valueCO2 || 0), color: '#FF0000', yAxis: 0 },
-                { name: 'Ext Temp', data: data.map(item => item.average_valueTemp || 0), color: '#609966', yAxis: 1 },
-                { name: 'Ext Hum', data: data.map(item => item.average_valueHum || 0), color: '#0000FF', yAxis: 2 }
-              );
-            }
-            if (m === 'int') {
-              series.push(
-                { name: 'Int CO2', data: data.map(item => item.average_valueCO2 || 0), color: '#B22222', yAxis: 0 },
-                { name: 'Int Temp', data: data.map(item => item.average_valueTemp || 0), color: '#B0C4DE', yAxis: 1 },
-                { name: 'Int Hum', data: data.map(item => item.average_valueHum || 0), color: '#8A2BE2', yAxis: 2 }
-              );
-            }
+            series.push(
+              {
+                name: `${m} CO2`,
+                data: data.map(item => item.average_valueCO2 || 0),
+                color: colorMap.env[index],
+                yAxis: 0
+              },
+              {
+                name: `${m} Temp`,
+                data: data.map(item => item.average_valueTemp || 0),
+                color: colorMap.env[index],
+                yAxis: 1
+              },
+              {
+                name: `${m} Hum`,
+                data: data.map(item => item.average_valueHum || 0),
+                color: colorMap.env[index],
+                yAxis: 2
+              }
+            );
           }
           if (type === 'soil') {
-            const colorMap = { '1': '#FFA500', '2': '#00CED1', '3': '#FF69B4', '4': '#808080' };
+            const soilIndex = parseInt(m) - 1;
             if (['1', '2', '3', '4'].includes(m)) {
               series.push(
-                { name: `Soil ${m} Hum`, data: data.map(item => item.average_valueSM || 0), color: colorMap[m], yAxis: 0 },
-                { name: `Soil ${m} Temp`, data: data.map(item => item.average_valueTemp || 0), color: colorMap[m], yAxis: 1 },
-                { name: `Soil ${m} EC`, data: data.map(item => item.average_valueEC || 0), color: colorMap[m], yAxis: 2 }
+                {
+                  name: `Soil ${m} Hum`,
+                  data: data.map(item => item.average_valueSM || 0),
+                  color: colorMap.soil[soilIndex],
+                  yAxis: 0
+                },
+                {
+                  name: `Soil ${m} Temp`,
+                  data: data.map(item => item.average_valueTemp || 0),
+                  color: colorMap.soil[soilIndex],
+                  yAxis: 1
+                },
+                {
+                  name: `Soil ${m} EC`,
+                  data: data.map(item => item.average_valueEC || 0),
+                  color: colorMap.soil[soilIndex],
+                  yAxis: 2
+                }
               );
             }
           }
@@ -1326,29 +1547,61 @@ function Dashboard() {
         (type === 'soil' && ['1', '2', '3', '4'].includes(mode))
       ) {
         const data = arr[0]?.data || [];
+        const index = type === 'soil' ? parseInt(mode) - 1 : (mode === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
-            name: mode === 'ext' ? 'Ext Lum' : 'Int Lum',
+            name: `Lum ${mode}`,
             data: data.map(item => item.average_value || item.value || 0),
-            color: mode === 'ext' ? '#F9B233' : '#40513B'
+            color: colorMap.light[index]
           });
         }
         if (type === 'env') {
           series.push(
-            { name: 'CO2', data: data.map(item => item.average_valueCO2 || 0), color: '#FF0000', yAxis: 0 },
-            { name: 'Temp', data: data.map(item => item.average_valueTemp || 0), color: '#609966', yAxis: 1 },
-            { name: 'Hum', data: data.map(item => item.average_valueHum || 0), color: '#0000FF', yAxis: 2 }
+            {
+              name: 'CO2',
+              data: data.map(item => item.average_valueCO2 || 0),
+              color: colorMap.env[index],
+              yAxis: 0
+            },
+            {
+              name: 'Temp',
+              data: data.map(item => item.average_valueTemp || 0),
+              color: colorMap.env[index],
+              yAxis: 1
+            },
+            {
+              name: 'Hum',
+              data: data.map(item => item.average_valueHum || 0),
+              color: colorMap.env[index],
+              yAxis: 2
+            }
           );
         }
         if (type === 'soil') {
           series.push(
-            { name: 'Hum', data: data.map(item => item.average_valueSM || 0), color: '#0000FF', yAxis: 0 },
-            { name: 'Temp', data: data.map(item => item.average_valueTemp || 0), color: '#609966', yAxis: 1 },
-            { name: 'EC', data: data.map(item => item.average_valueEC || 0), color: '#FF0000', yAxis: 2 }
+            {
+              name: `Soil ${mode} Hum`,
+              data: data.map(item => item.average_valueSM || 0),
+              color: colorMap.soil[index],
+              yAxis: 0
+            },
+            {
+              name: `Soil ${mode} Temp`,
+              data: data.map(item => item.average_valueTemp || 0),
+              color: colorMap.soil[index],
+              yAxis: 1
+            },
+            {
+              name: `Soil ${mode} EC`,
+              data: data.map(item => item.average_valueEC || 0),
+              color: colorMap.soil[index],
+              yAxis: 2
+            }
           );
         }
         categories = data.map(item => `${String(item.hour).padStart(2, '0')}:00`);
       }
+
       return {
         chart: { type: 'column', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
         title: { text: null },
@@ -1377,72 +1630,107 @@ function Dashboard() {
     // PIC-AVERAGE
     if (period[type] === 'pic-average') {
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      datasets.forEach(({ mode: m, data }) => {
+      datasets.forEach(({ mode: m, data }, index) => {
         if (type === 'light') {
           series.push(
             {
-              name: m === 'ext' ? 'Ext Max Day' : 'Int Max Day',
+              name: `Lum ${m} Max Day`,
               data: [data.max_day || 0],
-              color: m === 'ext' ? '#F9B233' : '#40513B'
+              color: colorMap.light[index]
             },
             {
-              name: m === 'ext' ? 'Ext Max Night' : 'Int Max Night',
+              name: `Lum ${m} Max Night`,
               data: [data.max_night || 0],
-              color: m === 'ext' ? '#DAA520' : '#2F4F4F'
-            },
-            {
-              name: m === 'ext' ? 'Ext Pic Avg' : 'Int Pic Avg',
-              data: [data.pic_average || 0],
-              color: m === 'ext' ? '#FFD700' : '#708090'
+              color: colorMap.light[index]
             }
           );
         }
         if (type === 'env') {
-          if (m === 'ext') {
-            series.push(
-              { name: 'Ext Max Day CO2', data: [data.max_day_CO2 || 0], color: '#FF0000', yAxis: 0 },
-              { name: 'Ext Max Night CO2', data: [data.max_night_CO2 || 0], color: '#B22222', yAxis: 0 },
-              { name: 'Ext Pic Avg CO2', data: [data.pic_average_CO2 || 0], color: '#DC143C', yAxis: 0 },
-              { name: 'Ext Max Day Temp', data: [data.max_day_Temp || 0], color: '#609966', yAxis: 1 },
-              { name: 'Ext Max Night Temp', data: [data.max_night_Temp || 0], color: '#9ACD32', yAxis: 1 },
-              { name: 'Ext Pic Avg Temp', data: [data.pic_average_Temp || 0], color: '#32CD32', yAxis: 1 },
-              { name: 'Ext Max Day Hum', data: [data.max_day_Hum || 0], color: '#0000FF', yAxis: 2 },
-              { name: 'Ext Max Night Hum', data: [data.max_night_Hum || 0], color: '#8A2BE2', yAxis: 2 },
-              { name: 'Ext Pic Avg Hum', data: [data.pic_average_Hum || 0], color: '#4169E1', yAxis: 2 }
-            );
-          }
-          if (m === 'int') {
-            series.push(
-              { name: 'Int Max Day CO2', data: [data.max_day_CO2 || 0], color: '#B22222', yAxis: 0 },
-              { name: 'Int Max Night CO2', data: [data.max_night_CO2 || 0], color: '#DC143C', yAxis: 0 },
-              { name: 'Int Pic Avg CO2', data: [data.pic_average_CO2 || 0], color: '#FF4500', yAxis: 0 },
-              { name: 'Int Max Day Temp', data: [data.max_day_Temp ||  0], color: '#B0C4DE', yAxis: 1 },
-              { name: 'Int Max Night Temp', data: [data.max_night_Temp || 0], color: '#ADD8E6', yAxis: 1 },
-              { name: 'Int Pic Avg Temp', data: [data.pic_average_Temp || 0], color: '#87CEFA', yAxis: 1 },
-              { name: 'Int Max Day Hum', data: [data.max_day_Hum || 0], color: '#8A2BE2', yAxis: 2 },
-              { name: 'Int Max Night Hum', data: [data.max_night_Hum || 0], color: '#9932CC', yAxis: 2 },
-              { name: 'Int Pic Avg Hum', data: [data.pic_average_Hum || 0], color: '#BA55D3', yAxis: 2 }
-            );
-          }
+          series.push(
+            {
+              name: `${m} Max Day CO2`,
+              data: [data.max_day_CO2 || 0],
+              color: colorMap.env[index],
+              yAxis: 0
+            },
+            {
+              name: `${m} Max Night CO2`,
+              data: [data.max_night_CO2 || 0],
+              color: colorMap.env[index],
+              yAxis: 0
+            },
+            {
+              name: `${m} Max Day Temp`,
+              data: [data.max_day_Temp || 0],
+              color: colorMap.env[index],
+              yAxis: 1
+            },
+            {
+              name: `${m} Max Night Temp`,
+              data: [data.max_night_Temp || 0],
+              color: colorMap.env[index],
+              yAxis: 1
+            },
+            {
+              name: `${m} Max Day Hum`,
+              data: [data.max_day_Hum || 0],
+              color: colorMap.env[index],
+              yAxis: 2
+            },
+            {
+              name: `${m} Max Night Hum`,
+              data: [data.max_night_Hum || 0],
+              color: colorMap.env[index],
+              yAxis: 2
+            }
+          );
         }
         if (type === 'soil') {
-          const colorMap = { '1': '#FFA500', '2': '#00CED1', '3': '#FF69B4', '4': '#808080' };
+          const soilIndex = parseInt(m) - 1;
           if (['1', '2', '3', '4'].includes(m)) {
             series.push(
-              { name: `Soil ${m} Max Day Hum`, data: [data.max_day_SM || 0], color: colorMap[m], yAxis: 0 },
-              { name: `Soil ${m} Max Night Hum`, data: [data.max_night_SM || 0], color: colorMap[m], yAxis: 0 },
-              { name: `Soil ${m} Pic Avg Hum`, data: [data.pic_average_SM || 0], color: colorMap[m], yAxis: 0 },
-              { name: `Soil ${m} Max Day Temp`, data: [data.max_day_Temp || 0], color: colorMap[m], yAxis: 1 },
-              { name: `Soil ${m} Max Night Temp`, data: [data.max_night_Temp || 0], color: colorMap[m], yAxis: 1 },
-              { name: `Soil ${m} Pic Avg Temp`, data: [data.pic_average_Temp || 0], color: colorMap[m], yAxis: 1 },
-              { name: `Soil ${m} Max Day EC`, data: [data.max_day_EC || 0], color: colorMap[m], yAxis: 2 },
-              { name: `Soil ${m} Max Night EC`, data: [data.max_night_EC || 0], color: colorMap[m], yAxis: 2 },
-              { name: `Soil ${m} Pic Avg EC`, data: [data.pic_average_EC || 0], color: colorMap[m], yAxis: 2 }
+              {
+                name: `Soil ${m} Max Day Hum`,
+                data: [data.max_day_SM || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 0
+              },
+              {
+                name: `Soil ${m} Max Night Hum`,
+                data: [data.max_night_SM || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 0
+              },
+              {
+                name: `Soil ${m} Max Day Temp`,
+                data: [data.max_day_Temp || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 1
+              },
+              {
+                name: `Soil ${m} Max Night Temp`,
+                data: [data.max_night_Temp || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 1
+              },
+              {
+                name: `Soil ${m} Max Day EC`,
+                data: [data.max_day_EC || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 2
+              },
+              {
+                name: `Soil ${m} Max Night EC`,
+                data: [data.max_night_EC || 0],
+                color: colorMap.soil[soilIndex],
+                yAxis: 2
+              }
             );
           }
         }
       });
-      categories = ['Day', 'Night', 'Average'];
+      categories = ['Day', 'Night'];
+
       return {
         chart: { type: 'column', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
         title: { text: null },
@@ -1470,6 +1758,7 @@ function Dashboard() {
         series
       };
     }
+
 
     // Fallback
     return {
@@ -1506,7 +1795,13 @@ function Dashboard() {
     }
   };
 
-  if (loading) return <div className="dashboard-bg">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="loading-overlay">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-bg">

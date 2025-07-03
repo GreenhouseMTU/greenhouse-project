@@ -23,7 +23,7 @@ def get_sensorLightExt():
         return jsonify({'message': 'No data available'}), 404
     
 
-# Nouveau endpoint pic-average pour Sensor_light_ext
+# Nouveau endpoint pic-average 
 
 @sensor_light_ext_app.route('/api/sensors/sensor_light_ext/day/pic-average', methods=['GET'])
 @jwt_required()

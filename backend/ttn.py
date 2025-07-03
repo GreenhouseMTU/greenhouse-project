@@ -18,6 +18,13 @@ import pytz
 # Blueprint pour les hooks TTN
 ttn_app = Blueprint('ttn_app', __name__)
 
+def safe_float(value):
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return None
+
+
 @ttn_app.route('/api/ttn/data', methods=['POST'])
 def ttn_webhook():
     db = current_app.db
@@ -50,11 +57,13 @@ def ttn_webhook():
         if device_id == "eui-2cf7f1c04430094f":  # extérieur light
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
             val = msgs[0].get("measurementValue", "") if msgs else ""
+            val = None if val == "" else val
             new_data = Sensor_light_ext(datetime=received_at, value=val)
 
         elif device_id == "eui-2cf7f1c044300975":  # intérieur light
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
             val = msgs[0].get("measurementValue", "") if msgs else ""
+            val = None if val == "" else val
             new_data = Sensor_light_int(datetime=received_at, value=val)
 
         # --- Capteurs CO2, Temp, Hum ---
@@ -72,19 +81,23 @@ def ttn_webhook():
                 Model = Sensor_CO2TempHum_ext
             else:
                 Model = Sensor_CO2TempHum_int
+            
+            def clean_int(val):
+                return None if val == "" else val
+
             new_data = Model(
                 datetime=received_at,
-                valueCO2=measurements.get(ID_CO2, ""),
-                valueTemp=measurements.get(ID_TEMP, ""),
-                valueHum=measurements.get(ID_HUM, "")
+                valueCO2=clean_int(measurements.get(ID_CO2, "")),
+                valueTemp=clean_int(measurements.get(ID_TEMP, "")),
+                valueHum=clean_int(measurements.get(ID_HUM, ""))
             )
 
         # --- Capteurs sol (SM, Temp, EC) ---
         elif device_id == "eui-2cf7f1c0435006c8":
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
-            measurement_valueTemp = msgs[0].get("measurementValue", "") if msgs else ""
-            measurement_valueSM   = msgs[1].get("measurementValue", "") if len(msgs) > 1 else ""
-            measurement_valueEC   = msgs[2].get("measurementValue", "") if len(msgs) > 2 else ""
+            measurement_valueTemp = safe_float(msgs[0].get("measurementValue")) if len(msgs) > 0 else None
+            measurement_valueSM   = safe_float(msgs[1].get("measurementValue")) if len(msgs) > 1 else None
+            measurement_valueEC   = safe_float(msgs[2].get("measurementValue")) if len(msgs) > 2 else None
             new_data = Sensor_SMTempEC_1(
                 datetime=received_at,
                 valueTemp=measurement_valueTemp,
@@ -94,9 +107,9 @@ def ttn_webhook():
 
         elif device_id == "eui-2cf7f1c043500707":
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
-            measurement_valueTemp = msgs[0].get("measurementValue", "") if msgs else ""
-            measurement_valueSM   = msgs[1].get("measurementValue", "") if len(msgs) > 1 else ""
-            measurement_valueEC   = msgs[2].get("measurementValue", "") if len(msgs) > 2 else ""
+            measurement_valueTemp = safe_float(msgs[0].get("measurementValue")) if len(msgs) > 0 else None
+            measurement_valueSM   = safe_float(msgs[1].get("measurementValue")) if len(msgs) > 1 else None
+            measurement_valueEC   = safe_float(msgs[2].get("measurementValue")) if len(msgs) > 2 else None
             new_data = Sensor_SMTempEC_2(
                 datetime=received_at,
                 valueTemp=measurement_valueTemp,
@@ -106,9 +119,9 @@ def ttn_webhook():
 
         elif device_id == "eui-2cf7f1c043500681":
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
-            measurement_valueTemp = msgs[0].get("measurementValue", "") if msgs else ""
-            measurement_valueSM   = msgs[1].get("measurementValue", "") if len(msgs) > 1 else ""
-            measurement_valueEC   = msgs[2].get("measurementValue", "") if len(msgs) > 2 else ""
+            measurement_valueTemp = safe_float(msgs[0].get("measurementValue")) if len(msgs) > 0 else None
+            measurement_valueSM   = safe_float(msgs[1].get("measurementValue")) if len(msgs) > 1 else None
+            measurement_valueEC   = safe_float(msgs[2].get("measurementValue")) if len(msgs) > 2 else None
             new_data = Sensor_SMTempEC_3(
                 datetime=received_at,
                 valueTemp=measurement_valueTemp,
@@ -118,9 +131,9 @@ def ttn_webhook():
 
         elif device_id == "eui-2cf7f1c0435005e6":
             msgs = data.get("uplink_message", {}).get("decoded_payload", {}).get("messages", [])
-            measurement_valueTemp = msgs[0].get("measurementValue", "") if msgs else ""
-            measurement_valueSM   = msgs[1].get("measurementValue", "") if len(msgs) > 1 else ""
-            measurement_valueEC   = msgs[2].get("measurementValue", "") if len(msgs) > 2 else ""
+            measurement_valueTemp = safe_float(msgs[0].get("measurementValue")) if len(msgs) > 0 else None
+            measurement_valueSM   = safe_float(msgs[1].get("measurementValue")) if len(msgs) > 1 else None
+            measurement_valueEC   = safe_float(msgs[2].get("measurementValue")) if len(msgs) > 2 else None
             new_data = Sensor_SMTempEC_4(
                 datetime=received_at,
                 valueTemp=measurement_valueTemp,
@@ -136,6 +149,7 @@ def ttn_webhook():
         db.session.add(new_data)
         db.session.commit()
         return jsonify({"message": "Data added successfully"}), 200
+
 
     except Exception as e:
         traceback.print_exc()
