@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HighchartsSection from './HighchartsSection';
-import '../styles/AppHome.css';
+import '../styles/Dashboard.css';
+import { formatDistanceToNow } from 'date-fns';
 
 const PERIODS = [
-  { value: 'day-average', label: 'Day average' },
   { value: 'full-day', label: 'Full day' },
+  { value: 'day-average', label: 'Day average' },
   { value: 'week', label: 'Week' },
   { value: 'month', label: 'Month' },
   { value: 'pic-average', label: 'Pic average (day/night)' },
@@ -20,6 +21,53 @@ const DATA_MODES = [
   { value: '3', label: 'Sensor 3' },
   { value: '4', label: 'Sensor 4' },
 ];
+
+
+const SensorStatusWidget = ({ type, sensors, mode, period }) => {
+  // Log pour déboguer
+  console.log('SensorStatusWidget:', { type, period: period[type], mode, sensors: sensors[type] });
+
+  // Ne rien afficher si la période pour ce type n'est pas 'full-day'
+  if (period[type] !== 'full-day') {
+    console.log(`Skipping widget for ${type}, period is ${period[type]}, not 'full-day'`);
+    return null;
+  }
+
+  const getSensorStatus = (data) => {
+    if (!data || !data.length || !data[data.length - 1]?.datetime) {
+      console.log(`No valid data for ${type}, mode ${data?.mode || 'unknown'}:`, data);
+      return { isActive: false, duration: 'N/A' };
+    }
+    // Interpréter datetime comme une date locale (IST, pas UTC)
+    const latest = new Date(data[data.length - 1].datetime);
+    const now = new Date();
+    const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const isActive = latest >= fifteenMinutesAgo;
+    const duration = formatDistanceToNow(latest, { addSuffix: true });
+    console.log(`Status for ${type}, mode ${data?.mode || 'unknown'}:`, { isActive, duration, latest: latest.toISOString() });
+    return { isActive, duration };
+  };
+
+  const modesToCheck = mode === 'all' 
+    ? (type === 'soil' ? ['1', '2', '3', '4'] : ['ext', 'int'])
+    : [mode];
+
+  return (
+    <div className="sensor-status-text">
+      {modesToCheck.map(m => {
+        const sensorData = sensors[type]?.find(s => s.mode === m)?.data;
+        const { isActive, duration } = getSensorStatus(sensorData);
+        const label = type === 'soil' ? `Sensor ${m}` : `${m === 'ext' ? 'Ext' : 'Int'} sensor`;
+        return (
+          <span key={m}>
+            {isActive ? '🟢' : '🔴'} <span className="sensor-label">{label}</span>: {isActive ? 'Last data' : 'Offline for'}: {duration}
+          </span>
+        );
+      })}
+    </div>
+  );
+};
+
 
 
 // Composant pour navigation semaine/mois
@@ -39,6 +87,7 @@ function PeriodNav({ periodType, offset, setOffset, label }) {
     </div>
   );
 }
+
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -145,50 +194,37 @@ function Dashboard() {
     const fetchAll = async () => {
       setLoading(true);
       setErrorMessage('');
-      const token = localStorage.getItem('access_token') || '';
+      const token = localStorage.getItem('access_token');
       if (!token) {
-        navigate('/login', { replace: true, state: { item: 'login' } });
+        navigate('/login', { state: { mode: 'login' } });
         return;
       }
 
       try {
-        const headers = { 'Authorization': `Bearer ${token}` };
+        const headers = { Authorization: `Bearer ${token}` };
         const results = {};
         const types = ['light', 'env', 'soil'];
 
         for (const type of types) {
-          let modesToFetch;
-          if (mode === 'all') {
-            modesToFetch = type === 'soil' ? ['1', '2', '3', '4'] : ['ext', 'int'];
-          } else if (type === 'soil' && ['1', '2', '3', '4'].includes(mode)) {
-            modesToFetch = [mode];
-          } else if (type !== 'soil' && ['ext', 'int'].includes(mode)) {
-            modesToFetch = [mode];
-          } else {
-            modesToFetch = [];
-          }
+          const modesToFetch = mode === 'all'
+            ? (type === 'soil' ? ['1', '2', '3', '4'] : ['ext', 'int'])
+            : (type === 'soil' && ['1', '2', '3', '4'].includes(mode)) || (type !== 'soil' && ['ext', 'int'].includes(mode))
+              ? [mode]
+              : [];
 
-          const arr = await Promise.all(
+          results[type] = await Promise.all(
             modesToFetch.map(async m => {
               let path = endpointMap[type][period[type]][m];
-              // Ajoute l'offset dans l'URL pour week et month
-              if (period[type] === 'week') {
-                path += `?offset=${weekOffset[type]}`;
-              } else if (period[type] === 'month') {
-                path += `?offset=${monthOffset[type]}`;
+              if (period[type] === 'week' || period[type] === 'month') {
+                path += `?offset=${period[type] === 'week' ? weekOffset[type] : monthOffset[type]}`;
               }
               const url = `http://localhost:8080${path}`;
               const res = await fetch(url, { headers });
-              if (!res.ok) {
-                return { mode: m, data: [] };
-              }
               const json = await res.json();
               const data = Array.isArray(json) ? json : [json];
               return { mode: m, data };
             })
           );
-
-          results[type] = arr;
         }
 
         setSensors(results);
@@ -285,18 +321,53 @@ function Dashboard() {
     }
   };
 
+
   const getLastValueBlock = (type, offset = 0) => {
     const arr = sensors[type] || [];
 
-    // Helper to calculate monthly average for a given field
+    // Configuration des champs par type
+    const typeConfig = {
+      light: {
+        fields: [{ key: 'value', unit: 'Lux', format: formatLux, label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Lum`, picKey: '' }],
+        modes: ['ext', 'int'],
+        gap: 24,
+        showSeparator: true,
+        separatorSize: '32px'
+      },
+      env: {
+        fields: [
+          { key: 'valueTemp', unit: '°C', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Temp`, picKey: 'Temp' },
+          { key: 'valueHum', unit: '%RH', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Hum`, picKey: 'Hum' },
+          { key: 'valueCO2', unit: 'ppm', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} CO₂`, picKey: 'CO2' }
+        ],
+        modes: ['ext', 'int'],
+        gap: 24,
+        showSeparator: true,
+        separatorSize: '32px'
+      },
+      soil: {
+        fields: [
+          { key: 'valueTemp', unit: '°C', label: mode => `Temp ${mode}`, picKey: 'Temp' },
+          { key: 'valueSM', unit: '%', label: mode => `Moist ${mode}`, picKey: 'SM' },
+          { key: 'valueEC', unit: 'dS/m', label: mode => `EC ${mode}`, picKey: 'EC' }
+        ],
+        modes: ['1', '2', '3', '4'],
+        gap: 16,
+        showSeparator: true,
+        separatorSize: '32px'
+      }
+    };
+
+    // Helper pour calculer la moyenne mensuelle
     const getMonthlyAverage = (data, field) => {
       if (!data || !data.length) return 'N/A';
       const values = data.map(item => item[field] ?? item[`average_${field}`] ?? null).filter(v => v !== null && !isNaN(v));
       if (!values.length) return 'N/A';
       const avg = values.reduce((sum, val) => sum + Number(val), 0) / values.length;
-      return avg.toFixed(2); // Round to 2 decimal places
+      return avg.toFixed(2);
     };
 
+    // Helper pour filtrer les données par mois
     const filterDataByMonthOffset = (data, offset) => {
       const now = new Date();
       const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
@@ -307,697 +378,88 @@ function Dashboard() {
         return date.getMonth() === targetMonth && date.getFullYear() === targetYear;
       });
     };
-    
 
-    // MONTH
-    if (period[type] === 'month') {
-      if (type === 'light') {
-        const ext = filterDataByMonthOffset(arr.find(s => s.mode === 'ext')?.data || [], offset);
-        const int = filterDataByMonthOffset(arr.find(s => s.mode === 'int')?.data || [], offset);
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(getMonthlyAverage(ext, 'value'))}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Ext Lum</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(getMonthlyAverage(int, 'value'))}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Int Lum</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-            const data = filterDataByMonthOffset(
-              arr.find(s => s.mode === mode)?.data || [],
-              offset
-            );
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {formatLux(getMonthlyAverage(data, 'value'))}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>
-                {mode === 'ext' ? 'Ext Lum' : 'Int Lum'}
-              </div>
-            </div>
-          );
-        }
-      }
-      if (type === 'env') {
-        const ext = filterDataByMonthOffset(arr.find(s => s.mode === 'ext')?.data || [], offset);
-        const int = filterDataByMonthOffset(arr.find(s => s.mode === 'int')?.data || [], offset);
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(ext, 'valueTemp')} °C
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(ext, 'valueHum')} %
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(ext, 'valueCO2')} ppm
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(int, 'valueTemp')} °C
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(int, 'valueHum')} %
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getMonthlyAverage(int, 'valueCO2')} ppm
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-            const data = filterDataByMonthOffset(
-              arr.find(s => s.mode === mode)?.data || [],
-              offset
-            );
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueTemp')} °C
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueHum')} %
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueCO2')} ppm
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>CO₂</div>
-            </div>
-          );
-        }
-      }
-      if (type === 'soil') {
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'flex-start' }}>
-                {['1', '2', '3', '4'].map((sensor, index) => {
-                  const data = filterDataByMonthOffset(arr.find(s => s.mode === sensor)?.data || [], offset);
-                  return (
-                    <React.Fragment key={sensor}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getMonthlyAverage(data, 'valueTemp')} °C
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getMonthlyAverage(data, 'valueSM')} %
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getMonthlyAverage(data, 'valueEC')} mS/cm
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>EC ({sensor})</div>
-                      </div>
-                      {index < 3 && (
-                        <div style={{ fontSize: 32, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        } else if (['1', '2', '3', '4'].includes(mode)) {
-          const data = filterDataByMonthOffset(arr[0]?.data || [], offset);
-          const labelColor = '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueTemp')} °C
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueSM')} %
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getMonthlyAverage(data, 'valueEC')} mS/cm
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC (Sensor {mode})</div>
-            </div>
-          );
-        }
-      }
-    }
+    // Helper pour formater la valeur
+    const formatValue = (value, field) => {
+      if (value === undefined || value === null || value === 'N/A') return 'N/A';
+      return field.format ? field.format(value) : `${value} ${field.unit}`;
+    };
 
-    // DAY-AVERAGE and WEEK
-    if (period[type] === 'day-average' || period[type] === 'week') {
-      if (type === 'light') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(getDailyAverage(ext, 'average_value'))}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Ext Lum</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(getDailyAverage(int, 'average_value'))}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Int Lum</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {formatLux(getDailyAverage(data, 'average_value'))}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>
-                {mode === 'ext' ? 'Ext Lum' : 'Int Lum'}
-              </div>
-            </div>
-          );
-        }
-      }
-      if (type === 'env') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(ext, 'average_valueTemp')} °C
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(ext, 'average_valueHum')} %
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(ext, 'average_valueCO2')} ppm
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(int, 'average_valueTemp')} °C
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(int, 'average_valueHum')} %
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {getDailyAverage(int, 'average_valueCO2')} ppm
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueTemp')} °C
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueHum')} %
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueCO2')} ppm
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>CO₂</div>
-            </div>
-          );
-        }
-      }
-      if (type === 'soil') {
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'flex-start' }}>
-                {['1', '2', '3', '4'].map((sensor, index) => {
-                  const data = arr.find(s => s.mode === sensor)?.data;
-                  return (
-                    <React.Fragment key={sensor}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getDailyAverage(data, 'average_valueTemp')} °C
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getDailyAverage(data, 'average_valueSM')} %
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {getDailyAverage(data, 'average_valueEC')} mS/cm
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>EC ({sensor})</div>
-                      </div>
-                      {index < 3 && (
-                        <div style={{ fontSize: 32, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        } else if (['1', '2', '3', '4'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueTemp')} °C
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueSM')} %
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {getDailyAverage(data, 'average_valueEC')} mS/cm
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC (Sensor {mode})</div>
-            </div>
-          );
-        }
-      }
-    }
+    // Helper pour générer le JSX d'une section de valeurs
+    const renderValueBlock = (data, fields, mode, periodType) => {
+      const isMonth = periodType === 'month';
+      const isDayAverageOrWeek = periodType === 'day-average' || periodType === 'week';
+      const isFullDay = periodType === 'full-day';
+      const isPicAverage = periodType === 'pic-average';
 
-    // FULL-DAY and PIC-AVERAGE
-    
-    // FULL-DAY
-    if (period[type] === 'full-day') {
-      if (type === 'light') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(ext && ext.length ? ext[ext.length - 1].value : 'N/A')}
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {fields.map(field => {
+              let value;
+              if (isMonth) {
+                value = getMonthlyAverage(data, field.key);
+              } else if (isDayAverageOrWeek) {
+                value = getDailyAverage(data, `average_${field.key}`);
+              } else if (isFullDay) {
+                value = data && data.length ? data[data.length - 1][field.key] : 'N/A';
+              } else if (isPicAverage) {
+                value = data && data.length ? data[0][`pic_average${field.picKey ? `_${field.picKey}` : ''}`] : 'N/A';
+              }
+              return (
+                <React.Fragment key={field.key}>
+                  <div style={{ fontSize: '29px', fontWeight: 800, color: '#40513B' }}>
+                    {formatValue(value, field)}
                   </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Ext Lum</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(int && int.length ? int[int.length - 1].value : 'N/A')}
+                  <div style={{ fontSize: isMonth || isDayAverageOrWeek || isPicAverage ? '16px' : '18px', color: '#40513B', fontWeight: 700 }}>
+                    {field.label(mode)}
                   </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Int Lum</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {formatLux(data && data.length ? data[data.length - 1].value : 'N/A')}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>
-                {mode === 'ext' ? 'Ext Lum' : 'Int Lum'}
-              </div>
-            </div>
-          );
-        }
-      }
-      if (type === 'env') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[ext.length - 1].valueTemp} °C` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[ext.length - 1].valueHum} %` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[ext.length - 1].valueCO2} ppm` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[int.length - 1].valueTemp} °C` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[int.length - 1].valueHum} %` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[int.length - 1].valueCO2} ppm` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueTemp} °C` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueHum} %` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueCO2} ppm` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>CO₂</div>
-            </div>
-          );
-        }
-      }
-      if (type === 'soil') {
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'flex-start' }}>
-                {['1', '2', '3', '4'].map((sensor, index) => {
-                  const data = arr.find(s => s.mode === sensor)?.data;
-                  return (
-                    <React.Fragment key={sensor}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[data.length - 1].valueTemp} °C` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[data.length - 1].valueSM} %` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[data.length - 1].valueEC} mS/cm` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>EC ({sensor})</div>
-                      </div>
-                      {index < 3 && (
-                        <div style={{ fontSize: 32, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        } else if (['1', '2', '3', '4'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueTemp} °C` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueSM} %` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[data.length - 1].valueEC} mS/cm` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC (Sensor {mode})</div>
-            </div>
-          );
-        }
-      }
-    }
-    // PIC-AVERAGE
-    if (period[type] === 'pic-average') {
-      if (type === 'light') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(ext && ext.length ? ext[0].pic_average : 'N/A')}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Ext Lum Avg</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {formatLux(int && int.length ? int[0].pic_average : 'N/A')}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Int Lum Avg</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {formatLux(data && data.length ? data[0].pic_average : 'N/A')}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>
-                {mode === 'ext' ? 'Ext Lum Avg' : 'Int Lum Avg'}
-              </div>
-            </div>
-          );
-        }
-      }
-      if (type === 'env') {
-        const ext = arr.find(s => s.mode === 'ext')?.data;
-        const int = arr.find(s => s.mode === 'int')?.data;
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 24, justifyContent: 'center' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[0].pic_average_Temp} °C` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[0].pic_average_Hum} %` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {ext && ext.length ? `${ext[0].pic_average_CO2} ppm` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂ Avg</div>
-                </div>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[0].pic_average_Temp} °C` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[0].pic_average_Hum} %` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
-                  <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                    {int && int.length ? `${int[0].pic_average_CO2} ppm` : 'N/A'}
-                  </div>
-                  <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>CO₂ Avg</div>
-                </div>
-              </div>
-            </div>
-          );
-        } else if (['ext', 'int'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = mode === 'ext' ? '#40513B' : '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp Avg</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_Hum} %` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum Avg</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_CO2} ppm` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>CO₂ Avg</div>
-            </div>
-          );
-        }
-      }
-      if (type === 'soil') {
-        if (mode === 'all') {
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', alignItems: 'flex-start' }}>
-                {['1', '2', '3', '4'].map((sensor, index) => {
-                  const data = arr.find(s => s.mode === sensor)?.data;
-                  return (
-                    <React.Fragment key={sensor}>
-                      <div style={{ textAlign: 'center' }}>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Temp Avg</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[0].pic_average_SM} %` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>Hum Avg</div>
-                        <div style={{ fontSize: 32, fontWeight: 800, color: '#40513B' }}>
-                          {data && data.length ? `${data[0].pic_average_EC} mS/cm` : 'N/A'}
-                        </div>
-                        <div style={{ fontSize: 16, color: '#40513B', fontWeight: 700 }}>EC Avg ({sensor})</div>
-                      </div>
-                      {index < 3 && (
-                        <div style={{ fontSize: 32, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        } else if (['1', '2', '3', '4'].includes(mode)) {
-          const data = arr[0]?.data;
-          const labelColor = '#40513B';
-          return (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 16, color: labelColor, fontWeight: 700, marginBottom: 8 }}>
-                {getValuesTitle(period[type], type)}
-              </div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_Temp} °C` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Temp Avg</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_SM} %` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>Hum Avg</div>
-              <div style={{ fontSize: 40, fontWeight: 800, color: '#40513B' }}>
-                {data && data.length ? `${data[0].pic_average_EC} mS/cm` : 'N/A'}
-              </div>
-              <div style={{ fontSize: 18, color: labelColor, fontWeight: 700 }}>EC Avg (Sensor {mode})</div>
-            </div>
-          );
-        }
-      }
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      );
+    };
+
+    const config = typeConfig[type];
+    if (!config) return <div style={{ textAlign: 'center', color: '#40513B' }}>No data available</div>;
+
+    if (mode === 'all') {
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '16px', color: '#40513B', fontWeight: 700, marginBottom: '8px' }}>
+            {getValuesTitle(period[type], type)}
+          </div>
+          <div style={{ display: 'flex', gap: config.gap, justifyContent: 'center', alignItems: 'flex-start' }}>
+            {config.modes.map((m, index) => {
+              const data = period[type] === 'month'
+                ? filterDataByMonthOffset(arr.find(s => s.mode === m)?.data || [], offset)
+                : arr.find(s => s.mode === m)?.data;
+              return (
+                <React.Fragment key={m}>
+                  {renderValueBlock(data, config.fields, m, period[type])}
+                  {config.showSeparator && index < config.modes.length - 1 && (
+                    <div style={{ fontSize: config.separatorSize, color: '#40513B', fontWeight: 700, alignSelf: 'center' }}>|</div>
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      );
+    } else if (config.modes.includes(mode)) {
+      const data = period[type] === 'month'
+        ? filterDataByMonthOffset(arr.find(s => s.mode === mode)?.data || [], offset)
+        : arr.find(s => s.mode === mode)?.data;
+      return (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '16px', color: '#40513B', fontWeight: 700, marginBottom: '8px' }}>
+            {getValuesTitle(period[type], type)}
+          </div>
+          {renderValueBlock(data, config.fields, mode, period[type])}
+        </div>
+      );
     }
 
     return <div style={{ textAlign: 'center', color: '#40513B' }}>No data available</div>;
@@ -1039,10 +501,11 @@ function Dashboard() {
 
   const RefreshButton = () => (
     <button
-      className="refresh-button"
+      className="refresh-button button-effect"
       onClick={() => setRefreshTrigger(t => t + 1)}
     >
       Refresh
+      <span></span><span></span><span></span><span></span>
     </button>
   );
 
@@ -1051,14 +514,12 @@ function Dashboard() {
     let series = [];
     let categories = [];
 
-    // Helper to convert datetime string to timestamp (in milliseconds)
     const getTimestamp = (datetimeStr) => {
       if (!datetimeStr) return null;
       return new Date(datetimeStr + 'Z').getTime();
     };
 
-    // Helpers for week/month
-    function getWeekDates(offset = 0) {
+    const getWeekDates = (offset = 0) => {
       const today = new Date();
       const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1 + offset * 7));
       return Array.from({ length: 7 }, (_, i) => {
@@ -1066,9 +527,9 @@ function Dashboard() {
         d.setDate(monday.getDate() + i);
         return d.toISOString().slice(0, 10);
       });
-    }
+    };
 
-    function getMonthDates(offset = 0) {
+    const getMonthDates = (offset = 0) => {
       const now = new Date();
       now.setMonth(now.getMonth() + offset);
       const year = now.getFullYear();
@@ -1077,16 +538,91 @@ function Dashboard() {
       return Array.from({ length: days }, (_, i) =>
         `${year}-${String(month + 1).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`
       );
-    }
-
-    // Définir les couleurs pour les capteurs (dégradé du noir au vert)
-    const colorMap = {
-      light: ['#000000', '#9DC08B'], // ext: noir, int: vert
-      env: ['#000000', '#9DC08B'],   // ext: noir, int: vert
-      soil: ['#000000', '#333333', '#666666', '#9DC08B'] // Sensor 1: noir, Sensor 2: gris foncé, Sensor 3: gris moyen, Sensor 4: vert
     };
 
-    // FULL-DAY
+    const colorMap = {
+      light: ['#000000', '#9DC08B'],
+      env: ['#000000', '#9DC08B'],
+      soil: ['#000000', '#333333', '#666666', '#9DC08B']
+    };
+
+    const baseOptions = {
+      chart: { backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
+      title: { text: null },
+      legend: {
+        layout: 'vertical',
+        align: 'right',
+        verticalAlign: 'middle',
+        enabled: true,
+        useHTML: true,
+        labelFormatter: function () {
+          return `
+            <div style="display: flex; align-items: center; width: 100px;">
+              <input type="checkbox"
+                    id="cb-${this.index}-${type}" 
+                    ${this.visible ? 'checked' : ''} 
+                    style="width: 20px; height: 20px; margin: 0 4px 0 0; flex-shrink: 0;"
+                    onchange="Highcharts.charts[this.chart.index].series[${this.index}].setVisible(this.checked);">
+              <span style="font-family: 'League Spartan', sans-serif; font-size: 18px; color: #40513B;">
+                ${this.name}
+              </span>
+            </div>
+          `;
+        }
+      },
+      plotOptions: {
+        series: {
+          showCheckbox: false, // Disable native Highcharts checkboxes
+          selected: true,
+          visible: true,
+          events: {
+            checkboxClick: function (event) {
+              this.setVisible(event.checked);
+            },
+            legendItemClick: function () {
+              // Prevent default legend click to avoid double toggling
+              return false;
+            },
+            mouseOver: function () {
+              const series = this;
+              const yAxisIndex = series.options.yAxis || 0;
+              if (series.chart.yAxis[yAxisIndex]) {
+                series.chart.yAxis[yAxisIndex].update({
+                  title: {
+                    style: {
+                      color: '#FF0000', // Rouge pour mettre en évidence
+                      fontWeight: 'bold'
+                    }
+                  },
+                  lineWidth: 3, // Épaisseur de la ligne de l'axe
+                  lineColor: '#FF0000' // Couleur de la ligne de l'axe
+                }, false);
+                series.chart.redraw();
+              }
+            },
+            mouseOut: function () {
+              const series = this;
+              const yAxisIndex = series.options.yAxis || 0;
+              if (series.chart.yAxis[yAxisIndex]) {
+                series.chart.yAxis[yAxisIndex].update({
+                  title: {
+                    style: {
+                      color: '#000000', // Couleur par défaut
+                      fontWeight: 'normal'
+                    }
+                  },
+                  lineWidth: 1, // Épaisseur par défaut
+                  lineColor: '#000000' // Couleur par défaut
+                }, false);
+                series.chart.redraw();
+              }
+            }
+          }
+        }
+      },
+      series
+    };
+
     if (period[type] === 'full-day') {
       if (mode === 'all') {
         arr.forEach(({ mode: m, data }, index) => {
@@ -1094,7 +630,11 @@ function Dashboard() {
             series.push({
               name: `Lum ${m}`,
               data: data.map(item => [getTimestamp(item.datetime), item.value || null]),
-              color: colorMap.light[index]
+              color: colorMap.light[index],
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             });
           }
           if (type === 'env') {
@@ -1103,46 +643,62 @@ function Dashboard() {
                 name: `${m} CO2`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueCO2 || null]),
                 color: colorMap.env[index],
-                yAxis: 0
+                yAxis: 0,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
               },
               {
                 name: `${m} Temp`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
                 color: colorMap.env[index],
-                yAxis: 1
+                yAxis: 1,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
               },
               {
                 name: `${m} Hum`,
                 data: data.map(item => [getTimestamp(item.datetime), item.valueHum || null]),
                 color: colorMap.env[index],
-                yAxis: 2
+                yAxis: 2,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
               }
             );
           }
-          if (type === 'soil') {
-            if (['1', '2', '3', '4'].includes(m)) {
-              const soilIndex = parseInt(m) - 1;
-              series.push(
-                {
-                  name: `Soil ${m} Hum`,
-                  data: data.map(item => [getTimestamp(item.datetime), item.valueSM || null]),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 0
-                },
-                {
-                  name: `Soil ${m} Temp`,
-                  data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 1
-                },
-                {
-                  name: `Soil ${m} EC`,
-                  data: data.map(item => [getTimestamp(item.datetime), item.valueEC || null]),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 2
-                }
-              );
-            }
+          if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
+            const soilIndex = parseInt(m) - 1;
+            series.push(
+              {
+                name: `Soil ${m} Moist`,
+                data: data.map(item => [getTimestamp(item.datetime), item.valueSM || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 0,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
+              },
+              {
+                name: `Soil ${m} Temp`,
+                data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 1,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
+              },
+              {
+                name: `Soil ${m} EC`,
+                data: data.map(item => [getTimestamp(item.datetime), item.valueEC || null]),
+                color: colorMap.soil[soilIndex],
+                yAxis: 2,
+                visible: true,
+                showInLegend: true,
+                showCheckbox: true
+              }
+            );
           }
         });
       } else if (
@@ -1150,13 +706,17 @@ function Dashboard() {
         (type === 'env' && ['ext', 'int'].includes(mode)) ||
         (type === 'soil' && ['1', '2', '3', '4'].includes(mode))
       ) {
-        const data = arr[0]?.data || [];
+        const data = arr.find(s => s.mode === mode)?.data || [];
         const index = type === 'soil' ? parseInt(mode) - 1 : (mode === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
             name: `Lum ${mode}`,
             data: data.map(item => [getTimestamp(item.datetime), item.value || null]),
-            color: colorMap.light[index]
+            color: colorMap.light[index],
+            marker: { enabled: true },
+            visible: true,
+            showInLegend: true,
+            showCheckbox: true
           });
         }
         if (type === 'env') {
@@ -1165,49 +725,67 @@ function Dashboard() {
               name: 'CO2',
               data: data.map(item => [getTimestamp(item.datetime), item.valueCO2 || null]),
               color: colorMap.env[index],
-              yAxis: 0
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: 'Temp',
               data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
               color: colorMap.env[index],
-              yAxis: 1
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: 'Hum',
               data: data.map(item => [getTimestamp(item.datetime), item.valueHum || null]),
               color: colorMap.env[index],
-              yAxis: 2
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
         if (type === 'soil') {
           series.push(
             {
-              name: `Soil ${mode} Hum`,
+              name: `Soil ${mode} Moist`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueSM || null]),
               color: colorMap.soil[index],
-              yAxis: 0
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `Soil ${mode} Temp`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueTemp || null]),
               color: colorMap.soil[index],
-              yAxis: 1
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `Soil ${mode} EC`,
               data: data.map(item => [getTimestamp(item.datetime), item.valueEC || null]),
               color: colorMap.soil[index],
-              yAxis: 2
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
       }
 
       return {
-        chart: { type: 'line', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
-        title: { text: null },
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'line' },
         xAxis: {
           type: 'datetime',
           title: { text: 'Time', style: { fontSize: '14px' } },
@@ -1226,15 +804,14 @@ function Dashboard() {
           title: { text: 'Luminosity (lux)' },
           min: 0
         } : type === 'soil' ? [
-          { title: { text: 'Humidity (%)' }, min: 0 },
+          { title: { text: 'Moisture (%)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'EC (mS/cm)' }, opposite: true, min: 0 }
+          { title: { text: 'EC (dS/m)' }, opposite: true, min: 0 }
         ] : [
           { title: { text: 'CO₂ (ppm)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'Humidity (%)' }, opposite: true, min: 0 }
+          { title: { text: 'Humidity (%RH)' }, opposite: true, min: 0 }
         ],
-        legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
         tooltip: {
           xDateFormat: '%Y-%m-%d %H:%M:%S',
           shared: true
@@ -1243,12 +820,11 @@ function Dashboard() {
       };
     }
 
-    // WEEK
     if (period[type] === 'week') {
-      const weekDates = getWeekDates(offset);
-      categories = weekDates;
+      categories = getWeekDates(offset);
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      datasets.forEach(({ mode: m, data }, index) => {
+      datasets.forEach(({ mode: m, data }) => {
+        const colorIndex = type === 'soil' ? parseInt(m) - 1 : (m === 'ext' ? 0 : 1);
         const valueMap = {};
         data.forEach(item => {
           const date = (item.date || '').slice(0, 10);
@@ -1269,67 +845,88 @@ function Dashboard() {
         if (type === 'light') {
           series.push({
             name: `Lum ${m}`,
-            data: weekDates.map(date => valueMap[date] ?? null),
-            color: colorMap.light[index],
-            marker: { enabled: true }
+            data: categories.map(date => valueMap[date] ?? null),
+            color: colorMap.light[colorIndex],
+            marker: { enabled: true },
+            visible: true,
+            showInLegend: true,
+            showCheckbox: true
           });
         }
         if (type === 'env') {
           series.push(
             {
               name: `${m} CO2`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].CO2 : null)),
-              color: colorMap.env[index],
+              data: categories.map(date => (valueMap[date] ? valueMap[date].CO2 : null)),
+              color: colorMap.env[colorIndex],
               yAxis: 0,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `${m} Temp`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
-              color: colorMap.env[index],
+              data: categories.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
+              color: colorMap.env[colorIndex],
               yAxis: 1,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `${m} Hum`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].Hum : null)),
-              color: colorMap.env[index],
+              data: categories.map(date => (valueMap[date] ? valueMap[date].Hum : null)),
+              color: colorMap.env[colorIndex],
               yAxis: 2,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
-        if (type === 'soil') {
+        if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
           const soilIndex = parseInt(m) - 1;
           series.push(
             {
-              name: `Soil ${m} Hum`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].SM : null)),
+              name: `Soil ${m} Moist`,
+              data: categories.map(date => (valueMap[date] ? valueMap[date].SM : null)),
               color: colorMap.soil[soilIndex],
               yAxis: 0,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `Soil ${m} Temp`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
+              data: categories.map(date => (valueMap[date] ? valueMap[date].Temp : null)),
               color: colorMap.soil[soilIndex],
               yAxis: 1,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `Soil ${m} EC`,
-              data: weekDates.map(date => (valueMap[date] ? valueMap[date].EC : null)),
+              data: categories.map(date => (valueMap[date] ? valueMap[date].EC : null)),
               color: colorMap.soil[soilIndex],
               yAxis: 2,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
       });
 
       return {
-        chart: { type: 'line', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
-        title: { text: null },
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'line' },
         xAxis: {
           categories,
           title: { text: 'Date', style: { fontSize: '14px' } },
@@ -1339,24 +936,20 @@ function Dashboard() {
           title: { text: 'Luminosity (lux)' },
           min: 0
         } : type === 'soil' ? [
-          { title: { text: 'Humidity (%)' }, min: 0 },
+          { title: { text: 'Moisture (%)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'EC (mS/cm)' }, opposite: true, min: 0 }
+          { title: { text: 'EC (dS/m)' }, opposite: true, min: 0 }
         ] : [
           { title: { text: 'CO₂ (ppm)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'Humidity (%)' }, opposite: true, min: 0 }
+          { title: { text: 'Humidity (%RH)' }, opposite: true, min: 0 }
         ],
-        legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
         series
       };
     }
 
-    // MONTH
     if (period[type] === 'month') {
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      series = [];
-
       const now = new Date();
       now.setMonth(now.getMonth() + offset);
       const year = now.getFullYear();
@@ -1367,12 +960,16 @@ function Dashboard() {
       const maxDate = lastDay.getTime();
 
       datasets.forEach(({ mode: m, data }, index) => {
+        const colorIndex = type === 'soil' ? parseInt(m) - 1 : (m === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
             name: `Lum ${m}`,
             data: data.map(item => [getTimestamp(item.date), item.average_value || null]),
-            color: colorMap.light[index],
-            marker: { enabled: true }
+            color: colorMap.light[colorIndex],
+            marker: { enabled: true },
+            visible: true,
+            showInLegend: true,
+            showCheckbox: true
           });
         }
         if (type === 'env') {
@@ -1380,65 +977,75 @@ function Dashboard() {
             {
               name: `${m} CO2`,
               data: data.map(item => [getTimestamp(item.date), item.average_valueCO2 || null]),
-              color: colorMap.env[index],
+              color: colorMap.env[colorIndex],
               yAxis: 0,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `${m} Temp`,
               data: data.map(item => [getTimestamp(item.date), item.average_valueTemp || null]),
-              color: colorMap.env[index],
+              color: colorMap.env[colorIndex],
               yAxis: 1,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
               name: `${m} Hum`,
               data: data.map(item => [getTimestamp(item.date), item.average_valueHum || null]),
-              color: colorMap.env[index],
+              color: colorMap.env[colorIndex],
               yAxis: 2,
-              marker: { enabled: true }
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
-        if (type === 'soil') {
-          const soilIndex = parseInt(m) - 1;
-          if (['1', '2', '3', '4'].includes(m)) {
-            series.push(
-              {
-                name: `Soil ${m} Hum`,
-                data: data.map(item => [getTimestamp(item.date), item.average_valueSM || null]),
-                color: colorMap.soil[soilIndex],
-                yAxis: 0,
-                marker: { enabled: true }
-              },
-              {
-                name: `Soil ${m} Temp`,
-                data: data.map(item => [getTimestamp(item.date), item.average_valueTemp || null]),
-                color: colorMap.soil[soilIndex],
-                yAxis: 1,
-                marker: { enabled: true }
-              },
-              {
-                name: `Soil ${m} EC`,
-                data: data.map(item => [getTimestamp(item.date), item.average_valueEC || null]),
-                color: colorMap.soil[soilIndex],
-                yAxis: 2,
-                marker: { enabled: true }
-              }
-            );
-          }
+        if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
+          const colorIndex = parseInt(m) - 1;
+          series.push(
+            {
+              name: `Soil ${m} Moist`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueSM || null]),
+              color: colorMap.soil[colorIndex],
+              yAxis: 0,
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            },
+            {
+              name: `Soil ${m} Temp`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueTemp || null]),
+              color: colorMap.soil[colorIndex],
+              yAxis: 1,
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            },
+            {
+              name: `Soil ${m} EC`,
+              data: data.map(item => [getTimestamp(item.date), item.average_valueEC || null]),
+              color: colorMap.soil[colorIndex],
+              yAxis: 2,
+              marker: { enabled: true },
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            }
+          );
         }
       });
 
       return {
-        chart: {
-          type: 'line',
-          backgroundColor: 'rgba(0,0,0,0)',
-          height: 400,
-          spacingBottom: 60,
-          zoomType: 'x'
-        },
-        title: { text: null },
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'line', zoomType: 'x' },
         xAxis: {
           type: 'datetime',
           min: minDate,
@@ -1460,151 +1067,109 @@ function Dashboard() {
           title: { text: 'Luminosity (lux)' },
           min: 0
         } : type === 'soil' ? [
-          { title: { text: 'Humidity (%)' }, min: 0 },
+          { title: { text: 'Moisture (%)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'EC (mS/cm)' }, opposite: true, min: 0 }
+          { title: { text: 'EC (dS/m)' }, opposite: true, min: 0 }
         ] : [
           { title: { text: 'CO₂ (ppm)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'Humidity (%)' }, opposite: true, min: 0 }
+          { title: { text: 'Humidity (%RH)' }, opposite: true, min: 0 }
         ],
-        legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
         tooltip: {
           xDateFormat: '%Y-%m-%d %H:%M:%S',
           shared: true
         },
-        series,
         navigator: { enabled: true },
-        rangeSelector: { enabled: false }
+        rangeSelector: { enabled: false },
+        series
       };
     }
 
-    // DAY-AVERAGE
     if (period[type] === 'day-average') {
-      if (mode === 'all') {
-        arr.forEach(({ mode: m, data }, index) => {
-          if (type === 'light') {
-            series.push({
-              name: `Lum ${m}`,
-              data: data.map(item => item.average_value || item.value || 0),
-              color: colorMap.light[index]
-            });
-          }
-          if (type === 'env') {
-            series.push(
-              {
-                name: `${m} CO2`,
-                data: data.map(item => item.average_valueCO2 || 0),
-                color: colorMap.env[index],
-                yAxis: 0
-              },
-              {
-                name: `${m} Temp`,
-                data: data.map(item => item.average_valueTemp || 0),
-                color: colorMap.env[index],
-                yAxis: 1
-              },
-              {
-                name: `${m} Hum`,
-                data: data.map(item => item.average_valueHum || 0),
-                color: colorMap.env[index],
-                yAxis: 2
-              }
-            );
-          }
-          if (type === 'soil') {
-            const soilIndex = parseInt(m) - 1;
-            if (['1', '2', '3', '4'].includes(m)) {
-              series.push(
-                {
-                  name: `Soil ${m} Hum`,
-                  data: data.map(item => item.average_valueSM || 0),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 0
-                },
-                {
-                  name: `Soil ${m} Temp`,
-                  data: data.map(item => item.average_valueTemp || 0),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 1
-                },
-                {
-                  name: `Soil ${m} EC`,
-                  data: data.map(item => item.average_valueEC || 0),
-                  color: colorMap.soil[soilIndex],
-                  yAxis: 2
-                }
-              );
-            }
-          }
-          if (!categories.length && data && data.length) {
-            categories = data.map(item => `${String(item.hour).padStart(2, '0')}:00`);
-          }
-        });
-      } else if (
-        (type === 'light' && ['ext', 'int'].includes(mode)) ||
-        (type === 'env' && ['ext', 'int'].includes(mode)) ||
-        (type === 'soil' && ['1', '2', '3', '4'].includes(mode))
-      ) {
-        const data = arr[0]?.data || [];
-        const index = type === 'soil' ? parseInt(mode) - 1 : (mode === 'ext' ? 0 : 1);
+      const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
+      datasets.forEach(({ mode: m, data }) => {
+        const colorIndex = type === 'soil' ? parseInt(m) - 1 : (m === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
-            name: `Lum ${mode}`,
+            name: `Lum ${m}`,
             data: data.map(item => item.average_value || item.value || 0),
-            color: colorMap.light[index]
+            color: colorMap.light[colorIndex],
+            visible: true,
+            showInLegend: true,
+            showCheckbox: true
           });
         }
         if (type === 'env') {
           series.push(
             {
-              name: 'CO2',
+              name: `${m} CO2`,
               data: data.map(item => item.average_valueCO2 || 0),
-              color: colorMap.env[index],
-              yAxis: 0
+              color: colorMap.env[colorIndex],
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: 'Temp',
+              name: `${m} Temp`,
               data: data.map(item => item.average_valueTemp || 0),
-              color: colorMap.env[index],
-              yAxis: 1
+              color: colorMap.env[colorIndex],
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: 'Hum',
+              name: `${m} Hum`,
               data: data.map(item => item.average_valueHum || 0),
-              color: colorMap.env[index],
-              yAxis: 2
+              color: colorMap.env[colorIndex],
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
-        if (type === 'soil') {
+        if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
+          const soilIndex = parseInt(m) - 1;
           series.push(
             {
-              name: `Soil ${mode} Hum`,
+              name: `Soil ${m} Moist`,
               data: data.map(item => item.average_valueSM || 0),
-              color: colorMap.soil[index],
-              yAxis: 0
+              color: colorMap.soil[soilIndex],
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: `Soil ${mode} Temp`,
+              name: `Soil ${m} Temp`,
               data: data.map(item => item.average_valueTemp || 0),
-              color: colorMap.soil[index],
-              yAxis: 1
+              color: colorMap.soil[soilIndex],
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: `Soil ${mode} EC`,
+              name: `Soil ${m} EC`,
               data: data.map(item => item.average_valueEC || 0),
-              color: colorMap.soil[index],
-              yAxis: 2
+              color: colorMap.soil[soilIndex],
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
-        categories = data.map(item => `${String(item.hour).padStart(2, '0')}:00`);
-      }
+        if (!categories.length && data?.length) {
+          categories = data.map(item => `${String(item.hour).padStart(2, '0')}:00`);
+        }
+      });
 
       return {
-        chart: { type: 'column', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
-        title: { text: null },
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'column' },
         xAxis: {
           categories,
           title: { text: 'Hours', style: { fontSize: '14px' } },
@@ -1614,126 +1179,101 @@ function Dashboard() {
           title: { text: 'Luminosity (lux)' },
           min: 0
         } : type === 'soil' ? [
-          { title: { text: 'Humidity (%)' }, min: 0 },
+          { title: { text: 'Moisture (%)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'EC (mS/cm)' }, opposite: true, min: 0 }
+          { title: { text: 'EC (dS/m)' }, opposite: true, min: 0 }
         ] : [
           { title: { text: 'CO₂ (ppm)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'Humidity (%)' }, opposite: true, min: 0 }
+          { title: { text: 'Humidity (%RH)' }, opposite: true, min: 0 }
         ],
-        legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
         series
       };
     }
 
-    // PIC-AVERAGE
     if (period[type] === 'pic-average') {
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
-      datasets.forEach(({ mode: m, data }, index) => {
+      datasets.forEach(({ mode: m, data }) => {
+        const colorIndex = type === 'soil' ? parseInt(m) - 1 : (m === 'ext' ? 0 : 1);
         if (type === 'light') {
-          series.push(
-            {
-              name: `Lum ${m} Max Day`,
-              data: [data.max_day || 0],
-              color: colorMap.light[index]
-            },
-            {
-              name: `Lum ${m} Max Night`,
-              data: [data.max_night || 0],
-              color: colorMap.light[index]
-            }
-          );
+          series.push({
+            name: `Lum ${m}`,
+            data: [data?.[0]?.max_day ?? null, data?.[0]?.max_night ?? null],
+            color: colorMap.light[colorIndex],
+            visible: true,
+            showInLegend: true,
+            showCheckbox: true
+          });
         }
         if (type === 'env') {
           series.push(
             {
-              name: `${m} Max Day CO2`,
-              data: [data.max_day_CO2 || 0],
-              color: colorMap.env[index],
-              yAxis: 0
+              name: `${m} CO2`,
+              data: [data?.[0]?.max_day_CO2 ?? 0, data?.[0]?.max_night_CO2 ?? 0],
+              color: colorMap.env[colorIndex],
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: `${m} Max Night CO2`,
-              data: [data.max_night_CO2 || 0],
-              color: colorMap.env[index],
-              yAxis: 0
+              name: `${m} Temp`,
+              data: [data?.[0]?.max_day_Temp ?? 0, data?.[0]?.max_night_Temp ?? 0],
+              color: colorMap.env[colorIndex],
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             },
             {
-              name: `${m} Max Day Temp`,
-              data: [data.max_day_Temp || 0],
-              color: colorMap.env[index],
-              yAxis: 1
-            },
-            {
-              name: `${m} Max Night Temp`,
-              data: [data.max_night_Temp || 0],
-              color: colorMap.env[index],
-              yAxis: 1
-            },
-            {
-              name: `${m} Max Day Hum`,
-              data: [data.max_day_Hum || 0],
-              color: colorMap.env[index],
-              yAxis: 2
-            },
-            {
-              name: `${m} Max Night Hum`,
-              data: [data.max_night_Hum || 0],
-              color: colorMap.env[index],
-              yAxis: 2
+              name: `${m} Hum`,
+              data: [data?.[0]?.max_day_Hum ?? 0, data?.[0]?.max_night_Hum ?? 0],
+              color: colorMap.env[colorIndex],
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
             }
           );
         }
-        if (type === 'soil') {
+        if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
           const soilIndex = parseInt(m) - 1;
-          if (['1', '2', '3', '4'].includes(m)) {
-            series.push(
-              {
-                name: `Soil ${m} Max Day Hum`,
-                data: [data.max_day_SM || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 0
-              },
-              {
-                name: `Soil ${m} Max Night Hum`,
-                data: [data.max_night_SM || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 0
-              },
-              {
-                name: `Soil ${m} Max Day Temp`,
-                data: [data.max_day_Temp || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 1
-              },
-              {
-                name: `Soil ${m} Max Night Temp`,
-                data: [data.max_night_Temp || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 1
-              },
-              {
-                name: `Soil ${m} Max Day EC`,
-                data: [data.max_day_EC || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 2
-              },
-              {
-                name: `Soil ${m} Max Night EC`,
-                data: [data.max_night_EC || 0],
-                color: colorMap.soil[soilIndex],
-                yAxis: 2
-              }
-            );
-          }
+          series.push(
+            {
+              name: `Soil ${m} Moist`,
+              data: [data?.[0]?.max_day_SM ?? 0, data?.[0]?.max_night_SM ?? 0],
+              color: colorMap.soil[soilIndex],
+              yAxis: 0,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            },
+            {
+              name: `Soil ${m} Temp`,
+              data: [data?.[0]?.max_day_Temp ?? 0, data?.[0]?.max_night_Temp ?? 0],
+              color: colorMap.soil[soilIndex],
+              yAxis: 1,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            },
+            {
+              name: `Soil ${m} EC`,
+              data: [data?.[0]?.max_day_EC ?? 0, data?.[0]?.max_night_EC ?? 0],
+              color: colorMap.soil[soilIndex],
+              yAxis: 2,
+              visible: true,
+              showInLegend: true,
+              showCheckbox: true
+            }
+          );
         }
       });
       categories = ['Day', 'Night'];
 
       return {
-        chart: { type: 'column', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
-        title: { text: null },
+        ...baseOptions,
+        chart: { ...baseOptions.chart, type: 'column' },
         xAxis: {
           categories,
           title: { text: 'Period', style: { fontSize: '14px' } },
@@ -1743,27 +1283,22 @@ function Dashboard() {
           title: { text: 'Luminosity (lux)' },
           min: 0
         } : type === 'soil' ? [
-          { title: { text: 'Humidity (%)' }, min: 0 },
+          { title: { text: 'Moisture (%)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'EC (mS/cm)' }, opposite: true, min: 0 }
+          { title: { text: 'EC (dS/m)' }, opposite: true, min: 0 }
         ] : [
           { title: { text: 'CO₂ (ppm)' }, min: 0 },
           { title: { text: 'Temp (°C)' }, opposite: true, min: 0 },
-          { title: { text: 'Humidity (%)' }, opposite: true, min: 0 }
+          { title: { text: 'Humidity (%RH)' }, opposite: true, min: 0 }
         ],
-        legend: { layout: 'vertical', align: 'right', verticalAlign: 'middle' },
-        tooltip: {
-          shared: true
-        },
+        tooltip: { shared: false },
         series
       };
     }
 
-
-    // Fallback
     return {
-      chart: { type: 'line', backgroundColor: 'rgba(0,0,0,0)', height: 400, spacingBottom: 60 },
-      title: { text: null },
+      ...baseOptions,
+      chart: { ...baseOptions.chart, type: 'line' },
       xAxis: { categories, title: { text: '' } },
       yAxis: { title: { text: '' } },
       series
@@ -1803,12 +1338,27 @@ function Dashboard() {
     );
   }
 
+
   return (
     <div className="dashboard-bg">
       <div className="dashboard-ribbon">
         <div className="ribbon-header">
-          <div className="ribbon-title">Greenhouse MTU</div>
-          <button className="logout-button" onClick={() => { localStorage.removeItem('access_token'); navigate('/login'); }}>Disconnect</button>
+          <div className="hover-title-container">
+            <div className="hover-title-text" data-text="Greenhouse MTU">Greenhouse MTU</div>
+          </div>
+          <ul className="nav-buttons">
+            <li style={{ '--i': '#609966', '--j': '#40513B' }} onClick={() => navigate('/home')}>
+              <span className="icon"><ion-icon name="home-outline"></ion-icon></span>
+              <span className="title">Home</span>
+            </li>
+            <li style={{ '--i': '#609966', '--j': '#40513B' }} onClick={() => {
+              localStorage.removeItem('access_token');
+              navigate('/login', { state: { mode: 'login' } });
+            }}>
+              <span className="icon"><ion-icon name="log-out-outline"></ion-icon></span>
+              <span className="title">Disconnect</span>
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -1822,7 +1372,10 @@ function Dashboard() {
             <option value="csv">CSV</option>
             <option value="json">JSON</option>
           </select>
-          <button onClick={exportData}>Export</button>
+          <button className="button-effect" onClick={exportData}>
+            Export
+            <span></span><span></span><span></span><span></span>
+          </button>
         </div>
       </div>
 
@@ -1844,6 +1397,7 @@ function Dashboard() {
               getWeekLabel={getWeekLabel}
               getMonthLabel={getMonthLabel}
             />
+            <SensorStatusWidget type="light" sensors={sensors} mode={mode} period={period} />
             <div className="section-divider"></div>
           </>
         )}
@@ -1864,6 +1418,7 @@ function Dashboard() {
               getWeekLabel={getWeekLabel}
               getMonthLabel={getMonthLabel}
             />
+            <SensorStatusWidget type="env" sensors={sensors} mode={mode} period={period} />
             <div className="section-divider"></div>
           </>
         )}
@@ -1884,6 +1439,7 @@ function Dashboard() {
               getWeekLabel={getWeekLabel}
               getMonthLabel={getMonthLabel}
             />
+            <SensorStatusWidget type="soil" sensors={sensors} mode={mode} period={period} />
             <div className="section-divider"></div>
           </>
         )}

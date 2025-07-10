@@ -1,4 +1,4 @@
-import '../styles/AppHome.css';
+import '../styles/Dashboard.css';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Home from './Home'; // Importe la nouvelle page Home

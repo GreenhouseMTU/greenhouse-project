@@ -20,6 +20,13 @@ function Login() {
   const [isSignUpMode, setIsSignUpMode] = useState(
     !(location.state && location.state.mode === 'login')
   );
+  const resetFields = () => {
+  setUsername('');
+  setPassword('');
+  setConfirmPassword('');
+  };
+
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +47,7 @@ function Login() {
   const handleClick = () => {
     setIsFadedIn(false);
     const newMode = !isSignUpMode;
+    if (newMode) resetFields();
     setIsSignUpMode(newMode);
     setSubtitle(newMode ? 'CREATE YOUR ACCOUNT' : 'LOGIN');
     setButton1(newMode ? 'SIGN UP' : 'SIGN IN');

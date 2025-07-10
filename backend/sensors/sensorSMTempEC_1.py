@@ -228,22 +228,26 @@ def get_sensorSMTempEC1Month():
         avg_parts = []
 
         for start_hour, end_hour, end_minute, end_second in part_intervals:
-            part_values = [val for val in sensorSMTempEC1MonthValues if start_hour <= val.datetime.hour <= end_hour and val.datetime.date() == date]
-            part_values = [int(entry.valueSM) for entry in part_values]
-            if part_values:
-                part_avg_value = sum(part_values) / len(part_values)
+            part_entries = [
+                val for val in sensorSMTempEC1MonthValues
+                if start_hour <= val.datetime.hour <= end_hour and val.datetime.date() == date
+            ]
+            
+            part_valuesSM = [int(entry.valueSM) for entry in part_entries]
+            part_valuesTemp = [int(entry.valueTemp) for entry in part_entries]
+            part_valuesEC = [int(entry.valueEC) for entry in part_entries]
+
+            if part_valuesSM:
                 part_date = datetime.combine(date, time(start_hour, end_minute, end_second))
-                avg_parts.append({'date': part_date.strftime('%Y-%m-%d %H:%M:%S'), 'average_valueSM': round(part_avg_value, 2)})
-
-                part_valuesTemp = [int(entry.valueTemp) for entry in part_values]
-                part_avg_valueTemp = sum(part_valuesTemp) / len(part_valuesTemp)
-                avg_parts[-1]['average_valueTemp'] = round(part_avg_valueTemp, 2)
-
-                part_valuesEC = [int(entry.valueEC) for entry in part_values]
-                part_avg_valueEC = sum(part_valuesEC) / len(part_valuesEC)
-                avg_parts[-1]['average_valueEC'] = round(part_avg_valueEC, 2)
+                avg_parts.append({
+                    'date': part_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'average_valueSM': round(sum(part_valuesSM) / len(part_valuesSM), 2),
+                    'average_valueTemp': round(sum(part_valuesTemp) / len(part_valuesTemp), 2),
+                    'average_valueEC': round(sum(part_valuesEC) / len(part_valuesEC), 2)
+                })
 
         results.extend(avg_parts)
+
 
     return jsonify(results)
 

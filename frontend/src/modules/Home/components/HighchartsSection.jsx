@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 
@@ -17,6 +17,8 @@ function HighchartsSection({
   getWeekLabel,
   getMonthLabel
 }) {
+  const chartRef = useRef(null);
+
   // Sélectionne l'offset selon la période
   const offset = period[type] === 'week'
     ? weekOffset[type]
@@ -58,10 +60,8 @@ function HighchartsSection({
         </div>
         <HighchartsReact
           highcharts={Highcharts}
-          options={getChartOptions(
-            type,
-            offset
-          )}
+          options={getChartOptions(type, offset)}
+          ref={chartRef}
         />
       </div>
     </div>

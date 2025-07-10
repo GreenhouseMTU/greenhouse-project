@@ -5,6 +5,7 @@ from flask_jwt_extended import JWTManager
 from flask_migrate import Migrate
 from flask_cors import CORS
 import logging
+from datetime import timedelta
 
 # Configurer le logging
 logging.basicConfig(level=logging.DEBUG)
@@ -22,6 +23,7 @@ def create_app():
     # Database config
     app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:adminNIMBUS-1@db:3306/greenhouse'
     app.config['JWT_SECRET_KEY'] = 'tHe_greeN_House_KEY'
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=6)
 
     # Initialiser db avec l'application
     db.init_app(app)

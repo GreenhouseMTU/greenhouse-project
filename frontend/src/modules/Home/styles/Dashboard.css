@@ -1,0 +1,535 @@
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+@font-face {
+  font-family: 'League Spartan';
+  src: url('../../../fonts/LeagueSpartan.ttf') format('truetype');
+}
+
+.dashboard-bg {
+  font-family: 'League Spartan', sans-serif;
+  background: linear-gradient(to bottom right, #DDE5B6, #FFFACD);
+  min-height: 100vh;
+  padding: 0 0 20px 0;
+  color: #40513B;
+  width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+.dashboard-ribbon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100vw;
+  margin: 0 0 20px 0;
+  padding: 12px 24px;
+  background-color: #9DC08B;
+  box-sizing: border-box;
+}
+
+.ribbon-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.hover-title-container {
+  position: relative;
+  display: inline-block;
+  padding: 0 20px;
+  cursor: pointer;
+}
+
+.hover-title-text {
+  font-size: 36px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #40513B;
+  position: relative;
+  transition: 0.6s;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.hover-title-text::before {
+  content: attr(data-text);
+  position: absolute;
+  color: #fff;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: 0.6s ease;
+}
+
+.hover-title-container::before {
+  content: "";
+  width: 0%;
+  height: 100%;
+  position: absolute;
+  background: #2980b9;
+  right: 0;
+  top: 0;
+  z-index: -1;
+  transition: 0.6s ease;
+}
+
+.hover-title-container:hover .hover-title-text::before,
+.hover-title-container:hover::before {
+  width: 100%;
+}
+
+.filters-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100vw;
+  margin: 0 auto 20px auto;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.mode-selector {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.data-selector {
+  padding: 8px 14px;
+  border-radius: 12px;
+  border: 2px solid #609966;
+  font-family: 'League Spartan', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  background: #f5f5f5;
+  color: #40513B;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 8px rgba(96, 153, 102, 0.3);
+}
+
+.data-selector:hover,
+.data-selector:focus {
+  background-color: #EDF1D6;
+  box-shadow: 0 6px 12px rgba(64, 81, 59, 0.5);
+  outline: none;
+}
+
+.export-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+select {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #9DC08B;
+  font-family: 'League Spartan', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  background: #EDF1D6;
+  color: #40513B;
+  font-weight: 600;
+}
+
+select:hover,
+select:focus {
+  border-color: #609966;
+  outline: none;
+}
+
+.dashboard-content {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  width: 100vw;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding-right: 32px;
+  padding-left: 16px;
+}
+
+.section-container {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 350px;
+  background: transparent;
+}
+
+.section-divider {
+  border-bottom: 2px solid #9DC08B;
+  width: 60%;
+  margin: 40px auto;
+}
+
+.section-values {
+  flex: 1;
+  text-align: center;
+  min-width: 220px;
+  align-self: stretch;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.section-chart {
+  margin-top: 20px;
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  background: transparent;
+  justify-content: center;
+  padding-right: 16px;
+  padding-bottom: 80px;
+  position: relative;
+  overflow: visible;
+}
+
+.chart-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.chart-title {
+  font-weight: 700;
+  font-size: 20px;
+  color: #40513B;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.week-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.week-btn {
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid #9DC08B;
+  background: #EDF1D6;
+  color: #40513B;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.week-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.week-label {
+  font-weight: 600;
+  font-size: 15px;
+  color: #40513B;
+}
+
+.chart-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.highcharts-container {
+  width: 100% !important;
+  height: 380px !important;
+}
+
+.section-title {
+  font-size: 40px;
+  font-weight: 700;
+  color: #40513B;
+  margin-bottom: 60px;
+  font-family: 'League Spartan', sans-serif;
+}
+
+.button-effect {
+  --c: #9DC08B;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+  transition: color 0.5s ease;
+  font-family: 'League Spartan', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  text-align: center;
+  border-radius: 12px;
+  color: #EDF1D6;
+  padding: 4px 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(96, 153, 102, 0.3);
+  border: 0.3em solid #609966; /* Bordure verte foncée pour tous les boutons */
+}
+
+.button-effect span {
+  position: absolute;
+  width: 25%;
+  height: 100%;
+  background-color: var(--c);
+  transform: translateY(700%);
+  border-radius: 50%;
+  left: calc((var(--n) - 1) * 25%);
+  transition: transform 0.5s ease;
+  transition-delay: calc((var(--n) - 1) * 0.1s);
+  z-index: -1;
+}
+
+.button-effect:hover {
+  color: #40513B;
+  background-color: transparent;
+  box-shadow: 0 6px 12px rgba(64, 81, 59, 0.5);
+}
+
+.button-effect:hover span {
+  transform: translateY(0) scale(2);
+}
+
+.button-effect span:nth-child(2) {
+  --n: 1;
+}
+
+.button-effect span:nth-child(3) {
+  --n: 2;
+}
+
+.button-effect span:nth-child(4) {
+  --n: 3;
+}
+
+.button-effect span:nth-child(5) {
+  --n: 4;
+}
+
+.refresh-button.button-effect {
+  background-color: #609966;
+}
+
+.logout-button.button-effect {
+  background-color: #40513B;
+}
+
+.button-effect:not(.refresh-button):not(.logout-button) {
+  background-color: #609966;
+}
+
+.nav-buttons {
+  display: flex;
+  position: relative;
+  gap: 25px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-items: center; /* Centre verticalement les boutons dans la liste */
+}
+
+.nav-buttons li {
+  position: relative;
+  list-style: none;
+  width: 60px;
+  height: 60px;
+  background: #EDF1D6; /* Fond vert clair par défaut */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  border-radius: 60px;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: all 0.5s ease; /* Transition fluide pour toutes les propriétés */
+}
+
+.nav-buttons li::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 60px;
+  background: linear-gradient(45deg, var(--i), var(--j));
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.nav-buttons li::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  width: 100%;
+  height: 100%;
+  border-radius: 60px;
+  background: linear-gradient(45deg, var(--i), var(--j));
+  transition: opacity 0.5s ease;
+  filter: blur(15px);
+  z-index: -1;
+  opacity: 0;
+}
+
+.nav-buttons li:hover {
+  width: 180px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0);
+}
+
+.nav-buttons li:hover::before {
+  opacity: 1;
+}
+
+.nav-buttons li:hover::after {
+  opacity: 0.5;
+}
+
+.nav-buttons li .icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 24px; /* Taille fixe pour les icônes */
+  height: 24px;
+}
+
+.nav-buttons li .icon ion-icon {
+  color: #40513B; /* Couleur de l'icône par défaut (vert foncé) */
+  font-size: 1.75em;
+  transition: transform 0.5s ease, opacity 0.5s ease;
+  transition-delay: 0.25s;
+}
+
+.nav-buttons li .icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain; /* Assure que l'image reste proportionnée */
+  transition: transform 0.5s ease, opacity 0.5s ease;
+  transition-delay: 0.25s;
+}
+
+.nav-buttons li:hover .icon ion-icon,
+.nav-buttons li:hover .icon img {
+  transform: scale(0);
+  opacity: 0;
+  transition-delay: 0s;
+}
+
+.nav-buttons li .title {
+  color: #fff;
+  font-size: 1.1em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  transform: scale(0);
+  transition: transform 0.5s ease, opacity 0.5s ease;
+  transition-delay: 0s;
+  font-family: 'Poppins', sans-serif;
+  position: absolute; /* Positionne le texte pour un centrage précis */
+  opacity: 0;
+}
+
+.nav-buttons li:hover .title {
+  transform: scale(1);
+  opacity: 1;
+  transition-delay: 0.25s;
+}
+
+
+.sensor-status-text {
+  text-align: center;
+  margin: -30px auto;
+  font-family: 'League Spartan', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #40513B;
+  flex-direction: row;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: center;
+  display: flex;
+}
+
+.sensor-status-text span {
+  display: inline-block;
+}
+
+.sensor-status-text .sensor-label {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+@media (max-width: 1200px) {
+  .section-container {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .section-values,
+  .section-chart {
+    width: 100%;
+  }
+
+  .section-title {
+    margin-bottom: 32px;
+    font-size: 32px;
+  }
+
+  .chart-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .section-chart {
+    padding-bottom: 80px;
+  }
+}
+
+@media (max-width: 768px) {
+  .section-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .section-title {
+    font-size: 28px;
+    margin-bottom: 24px;
+  }
+
+  .chart-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .section-chart {
+    padding-bottom: 70px;
+    overflow: visible;
+  }
+
+  .highcharts-container {
+    height: 300px !important;
+  }
+
+  .sensor-status-text {
+    font-size: 12px;
+    margin: 8px auto;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .filters-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 0 16px;
+  }
+}

@@ -22,10 +22,9 @@
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center;
-  opacity: 0.7; /* même opacité que login */
+  opacity: 0.7;
   z-index: -1;
 }
-
 
 .project-circle {
   position: relative;
@@ -126,17 +125,59 @@
   color: #fff;
 }
 
-@keyframes pulse {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.1); }
-  100% { transform: scale(1); }
-}
-
 .welcome-message {
   font-size: 40px;
   color: #40513B;
   margin-bottom: 40px;
   font-weight: 600;
+}
+
+.arrow {
+  position: relative;
+  margin-top: 20px; /* Espace sous la bulle */
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.arrow span {
+  display: block;
+  width: 20px; /* Taille adaptée */
+  height: 20px;
+  border-bottom: 4px solid #40513B; /* Couleur verte du thème */
+  border-right: 4px solid #40513B;
+  transform: rotate(45deg); /* Pointe vers le bas */
+  margin: -4px 0; /* Espacement vertical entre les chevrons */
+  animation: animate 2s infinite;
+}
+
+.arrow span:nth-child(2) {
+  animation-delay: -0.2s;
+}
+
+.arrow span:nth-child(3) {
+  animation-delay: -0.4s;
+}
+
+@keyframes animate {
+  0% {
+    opacity: 0;
+    transform: rotate(-135deg) translate(-15px, -15px);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(-135deg) translate(-15px, -15px);
+  }
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 @media (max-width: 1024px) {
@@ -155,6 +196,14 @@
 
   .welcome-message {
     font-size: 32px;
+  }
+
+  .arrow span {
+    width: 16px;
+    height: 16px;
+    border-bottom: 3px solid #40513B;
+    border-right: 3px solid #40513B;
+    margin: -3px 0;
   }
 }
 
@@ -181,5 +230,17 @@
   .welcome-message {
     font-size: 26px;
     margin-bottom: 20px;
+  }
+
+  .arrow span {
+    width: 12px;
+    height: 12px;
+    border-bottom: 2px solid #40513B;
+    border-right: 2px solid #40513B;
+    margin: -2px 0;
+  }
+
+  .arrow {
+    margin-top: 15px; /* Moins d'espace sur mobile */
   }
 }

@@ -20,7 +20,6 @@ function Home() {
 
   return (
     <div className="home-container">
-
       <h2 className="welcome-message">Welcome {username} !</h2>
 
       <div
@@ -39,6 +38,12 @@ function Home() {
             </button>
           </div>
         )}
+      </div>
+
+      <div className="arrow">
+        <span></span>
+        <span></span>
+        <span></span>
       </div>
     </div>
   );
