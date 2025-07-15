@@ -1,0 +1,122 @@
+/* Styling the sidebar (ribbon) on the left */
+.highlight-sidebar {
+  background-color: #9DC08B;
+  width: 250px;
+  min-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Header container for title */
+.highlight-sidebar-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* Title styling */
+.highlight-title-container {
+  margin-bottom: 20px;
+}
+
+.highlight-title-text {
+  font-size: 24px;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #40513B;
+  font-family: 'League Spartan', sans-serif;
+  transition: color 0.6s;
+}
+
+/* Navigation buttons container */
+.highlight-nav-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Individual navigation item */
+.highlight-nav-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+}
+
+.highlight-nav-item:hover {
+  background-color: #609966;
+}
+
+/* Icon styling */
+.highlight-nav-item .icon {
+  margin-right: 8px;
+}
+
+.highlight-nav-item .icon ion-icon {
+  color: #40513B;
+  font-size: 20px;
+}
+
+/* Title text for buttons */
+.highlight-nav-item .title {
+  color: #fff;
+  font-size: 1em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-family: 'League Spartan', sans-serif;
+  transition: opacity 0.5s ease;
+}
+
+/* Main content area */
+.highlight-main-content {
+  margin-left: 250px;
+  padding: 24px;
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+
+/* Modal overlay */
+.highlight-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* Loading overlay */
+.highlight-loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #f3f4f6;
+}
+
+/* Font face for League Spartan */
+@font-face {
+  font-family: 'League Spartan';
+  src: url('../fonts/LeagueSpartan.ttf') format('truetype');
+}
+

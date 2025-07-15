@@ -92,7 +92,7 @@ def create_app():
         app.register_blueprint(ttn_app)
 
         from auth import auth_app
-        app.register_blueprint(auth_app)
+        app.register_blueprint(auth_app, url_prefix='/api')
 
 
         from sensors.sensorLightExt import sensor_light_ext_app

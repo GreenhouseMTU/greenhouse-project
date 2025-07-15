@@ -110,6 +110,14 @@ function Dashboard() {
 
   const scrollPosition = useRef(0);
 
+
+  // Add new state for export modal
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [exportType, setExportType] = useState('light');
+  const [exportPeriod, setExportPeriod] = useState('full-day');
+  const [exportOffset, setExportOffset] = useState(0);
+
+
   const endpointMap = {
     light: {
       'full-day': {
@@ -1305,30 +1313,297 @@ function Dashboard() {
     };
   };
 
-  const exportData = () => {
-    let exportDataArray = [];
-    ['light', 'env', 'soil'].forEach(type => {
-      (sensors[type] || []).forEach(s => exportDataArray = exportDataArray.concat(s.data || []));
-    });
-    if (exportDataArray.length === 0) { alert("Aucune donnée à exporter"); return; }
-    if (exportFormat === 'csv') {
-      const keys = Object.keys(exportDataArray[0] || {});
-      const csvRows = [keys.join(','), ...exportDataArray.map(row => keys.map(k => row[k] || '').join(','))];
-      const csvContent = csvRows.join('\n');
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'export.csv'; a.click();
-      URL.revokeObjectURL(url);
-    } else if (exportFormat === 'json') {
-      const jsonContent = JSON.stringify(exportDataArray, null, 2);
-      const blob = new Blob([jsonContent], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'export.json'; a.click();
-      URL.revokeObjectURL(url);
+  const formatValue = (value, field) => {
+    if (value === undefined || value === null || isNaN(value) || (['valueSM', 'valueEC'].includes(field.key) && value === 0)) return '';
+    return field.format ? field.format(value) : `${parseFloat(value).toFixed(2)} ${field.unit}`;
+  };
+
+  const exportData = async () => {
+    if (!isExportModalOpen) {
+      setIsExportModalOpen(true);
+      return;
+    }
+
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      navigate('/login', { state: { mode: 'login' } });
+      return;
+    }
+
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      let exportDataArray = [];
+      const typesToFetch = exportType === 'all' ? ['light', 'env', 'soil'] : [exportType];
+
+      for (const type of typesToFetch) {
+        const modesToFetch = type === 'soil' ? ['1', '2', '3', '4'] : ['ext', 'int'];
+        console.log(`Exporting ${type}:`, { exportPeriod, exportOffset, modesToFetch });
+
+        const data = await Promise.all(
+          modesToFetch.map(async m => {
+            let path = endpointMap[type][exportPeriod][m];
+            if (exportPeriod === 'week' || exportPeriod === 'month') {
+              path += `?offset=${exportOffset}`;
+            }
+            const url = `http://localhost:8080${path}`;
+            console.log(`Fetching: ${url}`);
+            const res = await fetch(url, { headers });
+            if (!res.ok) {
+              throw new Error(`HTTP error! Status: ${res.status}, URL: ${url}`);
+            }
+            const json = await res.json();
+            console.log(`Response for ${type} mode ${m}:`, json);
+            const data = Array.isArray(json) ? json : [json];
+            return { mode: m, data };
+          })
+        );
+
+        data.forEach(s => {
+          if (exportPeriod === 'pic-average') {
+            // For pic-average, create separate rows for Day and Night
+            s.data.forEach(d => {
+              exportDataArray.push(
+                { type, mode: s.mode, period: 'Day', ...d },
+                { type, mode: s.mode, period: 'Night', ...d }
+              );
+            });
+          } else {
+            exportDataArray = exportDataArray.concat(
+              s.data.map(d => ({
+                type,
+                mode: s.mode,
+                ...d
+              }))
+            );
+          }
+        });
+      }
+
+      if (exportDataArray.length === 0) {
+        console.log('No data to export:', exportDataArray);
+        alert("Aucune donnée à exporter");
+        return;
+      }
+
+      if (exportFormat === 'csv') {
+        const typeConfig = {
+          light: {
+            fields: [
+              { key: 'value', unit: 'Lux', format: formatLux, label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Lum`, picKeys: ['max_day', 'max_night'] }
+            ]
+          },
+          env: {
+            fields: [
+              { key: 'valueTemp', unit: '°C', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Temp`, picKeys: ['max_day_Temp', 'max_night_Temp'] },
+              { key: 'valueHum', unit: '%RH', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Hum`, picKeys: ['max_day_Hum', 'max_night_Hum'] },
+              { key: 'valueCO2', unit: 'ppm', label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} CO₂`, picKeys: ['max_day_CO2', 'max_night_CO2'] }
+            ]
+          },
+          soil: {
+            fields: [
+              { key: 'valueTemp', unit: '°C', label: mode => `Temp ${mode}`, picKeys: ['max_day_Temp', 'max_night_Temp'] },
+              { key: 'valueSM', unit: '%', label: mode => `Moist ${mode}`, picKeys: ['max_day_SM', 'max_night_SM'] },
+              { key: 'valueEC', unit: 'dS/m', label: mode => `EC ${mode}`, picKeys: ['max_day_EC', 'max_night_EC'] }
+            ]
+          }
+        };
+
+        const allFields = exportType === 'all' ? [
+          ...typeConfig.light.fields.map(f => ({ ...f, type: 'light' })),
+          ...typeConfig.env.fields.map(f => ({ ...f, type: 'env' })),
+          ...typeConfig.soil.fields.map(f => ({ ...f, type: 'soil' }))
+        ] : typeConfig[exportType].fields.map(f => ({ ...f, type: exportType }));
+
+        const timeKey = exportPeriod === 'full-day' ? 'datetime' : exportPeriod === 'day-average' ? 'hour' : exportPeriod === 'pic-average' ? 'period' : 'date';
+        const keys = ['type', 'mode', timeKey];
+        const keyMap = {
+          'full-day': field => field.key,
+          'day-average': field => `average_${field.key}`,
+          'week': field => `average_${field.key}`,
+          'month': field => `average_${field.key}`,
+          'pic-average': field => field.picKeys
+        };
+
+        allFields.forEach(field => {
+          if (exportPeriod === 'pic-average') {
+            keyMap[exportPeriod](field).forEach(k => keys.push(k));
+          } else {
+            keys.push(keyMap[exportPeriod](field));
+          }
+        });
+
+        const csvRows = [
+          keys.map(k => {
+            if (k === 'type') return 'Type';
+            if (k === 'mode') return 'Mode';
+            if (k === 'datetime' || k === 'date') return 'Timestamp';
+            if (k === 'hour') return 'Hour';
+            if (k === 'period') return 'Period';
+            let fieldKey = k;
+            let prefix = '';
+            if (k.startsWith('max_day_')) {
+              fieldKey = k.replace('max_day_', '');
+              prefix = 'Day ';
+            } else if (k.startsWith('max_night_')) {
+              fieldKey = k.replace('max_night_', '');
+              prefix = 'Night ';
+            } else if (k === 'max_day' && fieldKey === 'max_day') {
+              fieldKey = 'value';
+              prefix = 'Day ';
+            } else if (k === 'max_night' && fieldKey === 'max_night') {
+              fieldKey = 'value';
+              prefix = 'Night ';
+            } else if (k.startsWith('average_')) {
+              fieldKey = k.replace('average_', '');
+              prefix = '';
+            }
+            const field = allFields.find(f => f.key === fieldKey || f.picKeys?.includes(k));
+            return field ? `${prefix}${field.label(field.type === 'soil' ? '1' : field.type === 'light' ? 'ext' : 'ext')}` : k;
+          }).join(','),
+          ...exportDataArray.map(row => {
+            // Filter keys to include only those relevant to the row's type
+            const relevantKeys = keys.filter(k => {
+              if (['type', 'mode', timeKey].includes(k)) return true;
+              const field = allFields.find(f => (exportPeriod === 'pic-average' ? f.picKeys?.includes(k) : k.includes(f.key)) && f.type === row.type);
+              return !!field;
+            });
+
+            const rowKeys = relevantKeys.map(k => {
+              if (k === 'type') return row.type || '';
+              if (k === 'mode') return row.mode || '';
+              if (k === timeKey) return row[timeKey] || '';
+              const field = allFields.find(f => (exportPeriod === 'pic-average' ? f.picKeys?.includes(k) : k.includes(f.key)) && f.type === row.type);
+              if (!field) return '';
+              if (exportPeriod === 'pic-average') {
+                // For pic-average, only include value if period matches key
+                if (row.period === 'Day' && (k.startsWith('max_night_') || k === 'max_night')) return '';
+                if (row.period === 'Night' && (k.startsWith('max_day_') || k === 'max_day')) return '';
+              }
+              const rawValue = row[k];
+              return formatValue(rawValue, field);
+            });
+            return rowKeys.join(',');
+          })
+        ].filter(row => row.split(',').some((val, idx) => idx > 2 && val !== '')); // Remove rows with no data beyond type/mode/period
+
+        const csvContent = '\uFEFF' + csvRows.join('\n'); // Add UTF-8 BOM
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export_${exportType}_${exportPeriod}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (exportFormat === 'json') {
+        const jsonContent = JSON.stringify(exportDataArray, null, 2);
+        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export_${exportType}_${exportPeriod}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      setIsExportModalOpen(false);
+    } catch (err) {
+      console.error('Export error:', err.message, err.stack);
+      alert('Failed to export data. Please try again.');
     }
   };
+
+    const ExportModal = () => (
+    <div className="modal-overlay">
+      <div className="modal-content">
+        <h2 className="modal-title">Export Data</h2>
+        <div className="modal-field">
+          <label>Data Type</label>
+          <select
+            value={exportType}
+            onChange={(e) => setExportType(e.target.value)}
+            className="modal-select"
+          >
+            <option value="all">All</option>
+            <option value="light">Light</option>
+            <option value="env">Environment</option>
+            <option value="soil">Soil</option>
+          </select>
+        </div>
+        <div className="modal-field">
+          <label>Period</label>
+          <select
+            value={exportPeriod}
+            onChange={(e) => {
+              setExportPeriod(e.target.value);
+              setExportOffset(0); // Reset offset when period changes
+            }}
+            className="modal-select"
+          >
+            {PERIODS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {(exportPeriod === "week" || exportPeriod === "month") && (
+          <div className="modal-field">
+            <label>{exportPeriod === "week" ? "Week" : "Month"}</label>
+            <div className="offset-controls">
+              <button
+                className="week-btn"
+                onClick={() => setExportOffset((prev) => prev - 1)}
+              >
+                {"<"}
+              </button>
+              <span className="week-label">
+                {exportPeriod === "week"
+                  ? getWeekLabel(exportOffset)
+                  : getMonthLabel(exportOffset)}
+              </span>
+              <button
+                className="week-btn"
+                onClick={() => setExportOffset((prev) => prev + 1)}
+                disabled={exportOffset >= 0}
+              >
+                {">"}
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="modal-field">
+          <label>Format</label>
+          <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value)}
+            className="modal-select"
+          >
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+          </select>
+        </div>
+        <div className="modal-actions">
+          <button className="button-effect modal-button" onClick={exportData}>
+            Export
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+          <button
+            className="button-effect modal-button cancel-button"
+            onClick={() => setIsExportModalOpen(false)}
+          >
+            Cancel
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -1344,7 +1619,7 @@ function Dashboard() {
       <div className="dashboard-ribbon">
         <div className="ribbon-header">
           <div className="hover-title-container">
-            <div className="hover-title-text" data-text="Greenhouse MTU">Greenhouse MTU</div>
+            <span className="hover-title-text" data-text="Greenhouse MTU">Greenhouse MTU</span>
           </div>
           <ul className="nav-buttons">
             <li style={{ '--i': '#609966', '--j': '#40513B' }} onClick={() => navigate('/home')}>
@@ -1368,17 +1643,13 @@ function Dashboard() {
           <DataSelector />
         </div>
         <div className="export-controls">
-          <select value={exportFormat} onChange={e => setExportFormat(e.target.value)}>
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-          </select>
           <button className="button-effect" onClick={exportData}>
             Export
             <span></span><span></span><span></span><span></span>
           </button>
         </div>
       </div>
-
+      {isExportModalOpen && <ExportModal />}
       <div className="dashboard-content">
         {(mode === 'all' || mode === 'ext' || mode === 'int') && (
           <>

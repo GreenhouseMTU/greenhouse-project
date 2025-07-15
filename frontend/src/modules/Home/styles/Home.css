@@ -26,6 +26,14 @@
   z-index: -1;
 }
 
+.projects-container {
+  display: flex;
+  flex-direction: row;
+  gap: 40px;
+  justify-content: center;
+  align-items: center;
+}
+
 .project-circle {
   position: relative;
   width: 420px;
@@ -83,6 +91,11 @@
   z-index: 1;
 }
 
+.project-info-bg.highlight-bg {
+  background: url('/Highlight.jpg') no-repeat center center;
+  background-size: cover;
+}
+
 .project-circle h1, .project-circle p {
   position: relative;
   z-index: 3;
@@ -134,7 +147,7 @@
 
 .arrow {
   position: relative;
-  margin-top: 20px; /* Espace sous la bulle */
+  margin-top: 20px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -143,12 +156,12 @@
 
 .arrow span {
   display: block;
-  width: 20px; /* Taille adaptée */
+  width: 20px;
   height: 20px;
-  border-bottom: 4px solid #40513B; /* Couleur verte du thème */
+  border-bottom: 4px solid #40513B;
   border-right: 4px solid #40513B;
-  transform: rotate(45deg); /* Pointe vers le bas */
-  margin: -4px 0; /* Espacement vertical entre les chevrons */
+  transform: rotate(45deg);
+  margin: -4px 0;
   animation: animate 2s infinite;
 }
 
@@ -181,6 +194,10 @@
 }
 
 @media (max-width: 1024px) {
+  .projects-container {
+    gap: 20px;
+  }
+
   .project-circle {
     width: 350px;
     height: 350px;
@@ -208,6 +225,11 @@
 }
 
 @media (max-width: 768px) {
+  .projects-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+
   .project-circle {
     width: 280px;
     height: 280px;
@@ -241,6 +263,6 @@
   }
 
   .arrow {
-    margin-top: 15px; /* Moins d'espace sur mobile */
+    margin-top: 15px;
   }
 }
