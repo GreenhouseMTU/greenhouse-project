@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import '../styles/Highlight.css'; // Use dedicated Highlight.css
+import '../styles/Highlight.css';
 import { formatDistanceToNow } from 'date-fns';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Rectangle } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import SensorStatus from './SensorStatus';
+import WeatherWidget from './WeatherWidget';
+import SMGauges from './SMGauges';
+import InteractiveCalendar from './TaskCalendar';
 
 const endpointMap = {
   light: { 'full-day': { ext: '/api/sensors/sensor_light_ext/day', int: '/api/sensors/sensor_light_int/day' } },
@@ -17,6 +21,13 @@ const endpointMap = {
     },
   },
 };
+
+const center = [51.885611, -8.535999];
+const delta = 0.00010;
+const greenhouseBounds = [
+  [center[0] + delta, center[1] - delta],
+  [center[0] - delta, center[1] + delta],
+];
 
 function Highlight() {
   const navigate = useNavigate();
@@ -45,7 +56,7 @@ function Highlight() {
         for (const type of types) {
           const modesToFetch = type === 'soil' ? ['1', '2', '3', '4'] : ['ext', 'int'];
           results[type] = await Promise.all(
-            modesToFetch.map(async m => {
+            modesToFetch.map(async (m) => {
               const path = endpointMap[type]['full-day'][m];
               const url = `http://localhost:8080${path}`;
               const res = await fetch(url, { headers });
@@ -77,12 +88,18 @@ function Highlight() {
       soil: { SM: { min: 10, max: 60, unit: '%' }, Temp: { min: 10, max: 30, unit: '°C' }, EC: { min: 0.1, max: 2.0, unit: 'dS/m' } },
     };
 
-    const calculateTrend = (values) => (values.length < 2 ? 'stable' : values.slice(0, Math.floor(values.length / 2)).reduce((sum, v) => sum + v, 0) / (values.length / 2) < values.slice(Math.floor(values.length / 2)).reduce((sum, v) => sum + v, 0) / (values.length / 2) ? 'increasing' : 'decreasing');
+    const calculateTrend = (values) =>
+      values.length < 2
+        ? 'stable'
+        : values.slice(0, Math.floor(values.length / 2)).reduce((sum, v) => sum + v, 0) / (values.length / 2) <
+          values.slice(Math.floor(values.length / 2)).reduce((sum, v) => sum + v, 0) / (values.length / 2)
+        ? 'increasing'
+        : 'decreasing';
 
     data.forEach(({ mode: m, data: sensorData }) => {
       if (!sensorData || sensorData.length === 0) return;
       if (type === 'light') {
-        const values = sensorData.map(d => d.value || d.average_value).filter(v => v !== null);
+        const values = sensorData.map((d) => d.value || d.average_value).filter((v) => v !== null);
         if (values.length === 0) return;
         const max = Math.max(...values), min = Math.min(...values), trend = calculateTrend(values);
         const label = m === 'ext' ? 'External Light' : 'Internal Light';
@@ -91,24 +108,28 @@ function Highlight() {
         insights.push(`${label}: Trend ${trend}.`);
       }
       if (type === 'env') {
-        ['valueCO2', 'valueTemp', 'valueHum'].forEach(key => {
-          const values = sensorData.map(d => d[key] || d[`average_${key}`]).filter(v => v !== null && !isNaN(v));
+        ['valueCO2', 'valueTemp', 'valueHum'].forEach((key) => {
+          const values = sensorData.map((d) => d[key] || d[`average_${key}`]).filter((v) => v !== null && !isNaN(v));
           if (values.length === 0) return;
           const max = Math.max(...values), min = Math.min(...values), trend = calculateTrend(values);
           const label = `${m === 'ext' ? 'External' : 'Internal'} ${{ valueCO2: 'CO2', valueTemp: 'Temperature', valueHum: 'Humidity' }[key]}`;
-          if (max > thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].max) insights.push(`${label}: High (${max} ${thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].unit}), exceeding range.`);
-          if (min < thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].min) insights.push(`${label}: Low (${min} ${thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].unit}), below range.`);
+          if (max > thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].max)
+            insights.push(`${label}: High (${max} ${thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].unit}), exceeding range.`);
+          if (min < thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].min)
+            insights.push(`${label}: Low (${min} ${thresholds.env[{ valueCO2: 'CO2', valueTemp: 'Temp', valueHum: 'Hum' }[key]].unit}), below range.`);
           insights.push(`${label}: Trend ${trend}.`);
         });
       }
       if (type === 'soil') {
-        ['valueSM', 'valueTemp', 'valueEC'].forEach(key => {
-          const values = sensorData.map(d => d[key] || d[`average_${key}`]).filter(v => v !== null && !isNaN(v));
+        ['valueSM', 'valueTemp', 'valueEC'].forEach((key) => {
+          const values = sensorData.map((d) => d[key] || d[`average_${key}`]).filter((v) => v !== null && !isNaN(v));
           if (values.length === 0) return;
           const max = Math.max(...values), min = Math.min(...values), trend = calculateTrend(values);
           const label = `Soil Sensor ${m} ${{ valueSM: 'Moisture', valueTemp: 'Temperature', valueEC: 'EC' }[key]}`;
-          if (max > thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].max) insights.push(`${label}: High (${max} ${thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].unit}), exceeding range.`);
-          if (min < thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].min) insights.push(`${label}: Low (${min} ${thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].unit}), below range.`);
+          if (max > thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].max)
+            insights.push(`${label}: High (${max} ${thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].unit}), exceeding range.`);
+          if (min < thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].min)
+            insights.push(`${label}: Low (${min} ${thresholds.soil[{ valueSM: 'SM', valueTemp: 'Temp', valueEC: 'EC' }[key]].unit}), below range.`);
           insights.push(`${label}: Trend ${trend}.`);
         });
       }
@@ -132,14 +153,16 @@ function Highlight() {
       const typesToFetch = exportType === 'all' ? ['light', 'env', 'soil'] : [exportType];
       for (const type of typesToFetch) {
         const insights = generateInsights(type, sensors[type]);
-        exportDataArray = exportDataArray.concat(insights.map((insight, index) => ({ type, insight: insight.replace(/,/g, ';'), timestamp: new Date().toISOString() })));
+        exportDataArray = exportDataArray.concat(
+          insights.map((insight, index) => ({ type, insight: insight.replace(/,/g, ';'), timestamp: new Date().toISOString() }))
+        );
       }
       if (exportDataArray.length === 0) {
         alert('No insights to export.');
         return;
       }
       if (exportFormat === 'csv') {
-        const csvContent = '\uFEFF' + ['Type,Insight,Timestamp', ...exportDataArray.map(row => `${row.type},${row.insight},${row.timestamp}`)].join('\n');
+        const csvContent = '\uFEFF' + ['Type,Insight,Timestamp', ...exportDataArray.map((row) => `${row.type},${row.insight},${row.timestamp}`)].join('\n');
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -164,28 +187,28 @@ function Highlight() {
   };
 
   const ExportModal = () => (
-    <div className="highlight-modal-overlay">
-      <div className="highlight-modal-content">
-        <h2 className="highlight-modal-title">Export Insights</h2>
-        <div className="highlight-modal-field">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+        <h2 className="text-lg font-semibold mb-4">Export Insights</h2>
+        <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Data Type</label>
-          <select value={exportType} onChange={(e) => setExportType(e.target.value)} className="highlight-modal-select">
+          <select value={exportType} onChange={(e) => setExportType(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
             <option value="all">All</option>
             <option value="light">Light</option>
             <option value="env">Environment</option>
             <option value="soil">Soil</option>
           </select>
         </div>
-        <div className="highlight-modal-field">
+        <div className="mb-4">
           <label className="block text-sm font-medium mb-1">Format</label>
-          <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} className="highlight-modal-select">
+          <select value={exportFormat} onChange={(e) => setExportFormat(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none">
             <option value="csv">CSV</option>
             <option value="json">JSON</option>
           </select>
         </div>
-        <div className="highlight-modal-actions">
-          <button className="highlight-button-effect bg-green-600 text-white" onClick={exportData}>Export</button>
-          <button className="highlight-button-effect bg-gray-300 text-gray-800" onClick={() => setIsExportModalOpen(false)}>Cancel</button>
+        <div className="flex justify-end gap-2">
+          <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700" onClick={exportData}>Export</button>
+          <button className="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400" onClick={() => setIsExportModalOpen(false)}>Cancel</button>
         </div>
       </div>
     </div>
@@ -193,7 +216,7 @@ function Highlight() {
 
   const renderInsights = () => {
     const typesToRender = ['light', 'env', 'soil'];
-    return typesToRender.map(type => {
+    return typesToRender.map((type) => {
       const insights = generateInsights(type, sensors[type]);
       return (
         <div key={type} className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 mb-6">
@@ -210,7 +233,7 @@ function Highlight() {
 
   if (loading) {
     return (
-      <div className="highlight-loading-overlay">
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <span className="text-xl font-semibold text-gray-600">Loading...</span>
       </div>
     );
@@ -240,71 +263,34 @@ function Highlight() {
         </div>
       </div>
       <div className="highlight-main-content">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          {/* Small Boxes at the Top */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-            <svg className="fill-gray-800 dark:fill-white/90" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" clipRule="evenodd" d="M11.665 3.75621C11.8762 3.65064 12.1247 3.65064 12.3358 3.75621L18.7807 6.97856L12.3358 10.2009C12.1247 10.3065 11.8762 10.3065 11.665 10.2009L5.22014 6.97856L11.665 3.75621ZM4.29297 8.19203V16.0946C4.29297 16.3787 4.45347 16.6384 4.70757 16.7654L11.25 20.0366V11.6513C11.1631 11.6205 11.0777 11.5843 10.9942 11.5426L4.29297 8.19203ZM12.75 20.037L19.2933 16.7654C19.5474 16.6384 19.7079 16.3787 19.7079 16.0946V8.19202L13.0066 11.5426C12.9229 11.5844 12.8372 11.6208 12.75 11.6516V20.037ZM13.0066 2.41456C12.3732 2.09786 11.6277 2.09786 10.9942 2.41456L4.03676 5.89319C3.27449 6.27432 2.79297 7.05342 2.79297 7.90566V16.0946C2.79297 16.9469 3.27448 17.726 4.03676 18.1071L10.9942 21.5857L11.3296 20.9149L10.9942 21.5857C11.6277 21.9024 12.3732 21.9024 13.0066 21.5857L19.9641 18.1071C20.7264 17.726 21.2079 16.9469 21.2079 16.0946V7.90566C21.2079 7.05342 20.7264 6.27432 19.9641 5.89319L13.0066 2.41456Z" />
-            </svg>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800"></div>
-            <div className="mt-5 flex items-end justify-between">
-              <div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Orders</span>
-                <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">5,359</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03] md:p-4">
+            <div className="grid grid-cols-2 gap-2 h-full min-h-[100px]">
+              <div className="col-span-1 flex flex-col h-full">
+                <SensorStatus sensors={sensors} totalSensors={8} />
               </div>
-              <span className="flex items-center gap-1 rounded-full bg-error-50 py-0.5 pl-2 pr-2.5 text-sm font-medium text-error-600 dark:bg-error-500/15 dark:text-error-500">
-                <svg className="fill-current" width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M5.31462 10.3761C5.45194 10.5293 5.65136 10.6257 5.87329 10.6257C5.8736 10.6257 5.8739 10.6257 5.87421 10.6257C6.0663 10.6259 6.25845 10.5527 6.40505 10.4062L9.40514 7.4082C9.69814 7.11541 9.69831 6.64054 9.40552 6.34754C9.11273 6.05454 8.63785 6.05438 8.34486 6.34717L6.62329 8.06753L6.62329 1.875C6.62329 1.46079 6.28751 1.125 5.87329 1.125C5.45908 1.125 5.12329 1.46079 5.12329 1.875L5.12329 8.06422L3.40516 6.34719C3.11218 6.05439 2.6373 6.05454 2.3445 6.34752C2.0517 6.64051 2.05185 7.11538 2.34484 7.40818L5.31462 10.3761Z" />
-                </svg>
-                9.05%
-              </span>
+              <div className="col-span-1 flex flex-col h-full">
+                <div className="weather-card-custom h-full flex flex-col justify-between">
+                  <WeatherWidget cityId="2964020" apiKey="9566ed907dba44c0a9d55913103019e4" units="metric" />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-            <svg className="fill-gray-800 dark:fill-white/90" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" clipRule="evenodd" d="M11.665 3.75621C11.8762 3.65064 12.1247 3.65064 12.3358 3.75621L18.7807 6.97856L12.3358 10.2009C12.1247 10.3065 11.8762 10.3065 11.665 10.2009L5.22014 6.97856L11.665 3.75621ZM4.29297 8.19203V16.0946C4.29297 16.3787 4.45347 16.6384 4.70757 16.7654L11.25 20.0366V11.6513C11.1631 11.6205 11.0777 11.5843 10.9942 11.5426L4.29297 8.19203ZM12.75 20.037L19.2933 16.7654C19.5474 16.6384 19.7079 16.3787 19.7079 16.0946V8.19202L13.0066 11.5426C12.9229 11.5844 12.8372 11.6208 12.75 11.6516V20.037ZM13.0066 2.41456C12.3732 2.09786 11.6277 2.09786 10.9942 2.41456L4.03676 5.89319C3.27449 6.27432 2.79297 7.05342 2.79297 7.90566V16.0946C2.79297 16.9469 3.27448 17.726 4.03676 18.1071L10.9942 21.5857L11.3296 20.9149L10.9942 21.5857C11.6277 21.9024 12.3732 21.9024 13.0066 21.5857L19.9641 18.1071C20.7264 17.726 21.2079 16.9469 21.2079 16.0946V7.90566C21.2079 7.05342 20.7264 6.27432 19.9641 5.89319L13.0066 2.41456Z" />
-            </svg>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800"></div>
-            <div className="mt-5 flex items-end justify-between">
-              <div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Revenue</span>
-                <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">$12,450</h4>
-              </div>
-              <span className="flex items-center gap-1 rounded-full bg-success-50 py-0.5 pl-2 pr-2.5 text-sm font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">
-                <svg className="fill-current" width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M6.68538 1.6239C6.54806 1.4707 6.34864 1.3743 6.12671 1.3743C6.1264 1.3743 6.1261 1.3743 6.12579 1.3743C5.9337 1.3741 5.74155 1.4473 5.59495 1.5938L2.59486 4.5918C2.30186 4.88459 2.30169 5.35946 2.59448 5.65246C2.88728 5.94546 3.36216 5.94562 3.65515 5.65283L5.37672 3.93247L5.37672 10.125C5.37672 10.5392 5.7125 10.875 6.12671 10.875C6.54093 10.875 6.87672 10.5392 6.87672 10.125L6.87672 3.93578L8.59485 5.65281C8.88783 5.94561 9.36271 5.94546 9.65551 5.65248C9.94831 5.35949 9.94816 4.88462 9.65517 4.59182L6.68538 1.6239Z" />
-                </svg>
-                5.23%
-              </span>
-            </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]">
+            <SMGauges />
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
-            <svg className="fill-gray-800 dark:fill-white/90" width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" clipRule="evenodd" d="M11.665 3.75621C11.8762 3.65064 12.1247 3.65064 12.3358 3.75621L18.7807 6.97856L12.3358 10.2009C12.1247 10.3065 11.8762 10.3065 11.665 10.2009L5.22014 6.97856L11.665 3.75621ZM4.29297 8.19203V16.0946C4.29297 16.3787 4.45347 16.6384 4.70757 16.7654L11.25 20.0366V11.6513C11.1631 11.6205 11.0777 11.5843 10.9942 11.5426L4.29297 8.19203ZM12.75 20.037L19.2933 16.7654C19.5474 16.6384 19.7079 16.3787 19.7079 16.0946V8.19202L13.0066 11.5426C12.9229 11.5844 12.8372 11.6208 12.75 11.6516V20.037ZM13.0066 2.41456C12.3732 2.09786 11.6277 2.09786 10.9942 2.41456L4.03676 5.89319C3.27449 6.27432 2.79297 7.05342 2.79297 7.90566V16.0946C2.79297 16.9469 3.27448 17.726 4.03676 18.1071L10.9942 21.5857L11.3296 20.9149L10.9942 21.5857C11.6277 21.9024 12.3732 21.9024 13.0066 21.5857L19.9641 18.1071C20.7264 17.726 21.2079 16.9469 21.2079 16.0946V7.90566C21.2079 7.05342 20.7264 6.27432 19.9641 5.89319L13.0066 2.41456Z" />
-            </svg>
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 dark:bg-gray-800"></div>
-            <div className="mt-5 flex items-end justify-between">
-              <div>
-                <span className="text-sm text-gray-500 dark:text-gray-400">Users</span>
-                <h4 className="mt-2 text-title-sm font-bold text-gray-800 dark:text-white/90">1,234</h4>
-              </div>
-              <span className="flex items-center gap-1 rounded-full bg-success-50 py-0.5 pl-2 pr-2.5 text-sm font-medium text-success-600 dark:bg-success-500/15 dark:text-success-500">
-                <svg className="fill-current" width="12" height="12" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg">
-                  <path fillRule="evenodd" clipRule="evenodd" d="M6.68538 1.6239C6.54806 1.4707 6.34864 1.3743 6.12671 1.3743C6.1264 1.3743 6.1261 1.3743 6.12579 1.3743C5.9337 1.3741 5.74155 1.4473 5.59495 1.5938L2.59486 4.5918C2.30186 4.88459 2.30169 5.35946 2.59448 5.65246C2.88728 5.94546 3.36216 5.94562 3.65515 5.65283L5.37672 3.93247L5.37672 10.125C5.37672 10.5392 5.7125 10.875 6.12671 10.875C6.54093 10.875 6.87672 10.5392 6.87672 10.125L6.87672 3.93578L8.59485 5.65281C8.88783 5.94561 9.36271 5.94546 9.65551 5.65248C9.94831 5.35949 9.94816 4.88462 9.65517 4.59182L6.68538 1.6239Z" />
-                </svg>
-                3.15%
-              </span>
-            </div>
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 revenue-users-card">
+            <InteractiveCalendar />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-6 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           <div className="col-span-2">
-            <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03] relative">
               <MapContainer
                 center={[51.8856, -8.5360]}
-                zoom={16}
+                zoom={30}
                 scrollWheelZoom={false}
-                style={{ height: '500px', width: '100%' }}
+                style={{ height: '500px', width: '100%', zIndex: 0  }}
                 className="rounded-2xl"
               >
                 <TileLayer
@@ -314,6 +300,7 @@ function Highlight() {
                 <Marker position={[51.8856, -8.5360]}>
                   <Popup>Greenhouse MTU</Popup>
                 </Marker>
+                <Rectangle bounds={greenhouseBounds} pathOptions={{ color: '#ff0800ff', weight: 1 }} />
               </MapContainer>
             </div>
           </div>
