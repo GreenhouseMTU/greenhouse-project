@@ -10,7 +10,12 @@ What is done :
 - Save data in database
 - Data filtering for endpoints (day, week, month, etc.)
 - Frontend login page
+- Frontend Home page
+- Frontend Dashboard page
+- Frontend Highlight page
 
 What remains to be done: 
 - Configure proxy and SSL certificate
-- Link the frontend with the backend
+- Add more advanced visualizations and analytics to the Highlight page.
+
+

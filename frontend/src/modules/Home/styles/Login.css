@@ -63,6 +63,7 @@
     border: none;
     outline: none;
     margin-bottom: 20px;
+    color: #000;
 }
 .input::placeholder{
     color: #B1A9A9;

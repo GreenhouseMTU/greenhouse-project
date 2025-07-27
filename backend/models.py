@@ -133,3 +133,27 @@ class Sensor_SMTempEC_4(db.Model):
             'valueTemp': self.valueTemp,
             'valueEC': self.valueEC
         }
+
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    title = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text)
+    date = db.Column(db.Date, nullable=False)
+    time = db.Column(db.String(20), nullable=False)
+    priority = db.Column(db.String(20))
+    category = db.Column(db.String(50))
+    color = db.Column(db.String(20))
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+
+    def serialize(self):
+        return {
+            'id': self.id,
+            'title': self.title,
+            'description': self.description,
+            'date': self.date.isoformat(),
+            'time': self.time,
+            'priority': self.priority,
+            'category': self.category,
+            'color': self.color,
+            'user_id': self.user_id
+        }

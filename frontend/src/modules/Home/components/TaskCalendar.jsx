@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function InteractiveCalendar() {
   const [tasks, setTasks] = useState([]);
@@ -14,9 +14,10 @@ function InteractiveCalendar() {
     category: 'other',
     color: 'purple'
   });
+  const [selectedTask, setSelectedTask] = useState(null); // <-- Pour la modale de détail
 
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const today = new Date('2025-07-22T15:28:00+05:30'); // 03:28 PM IST
+  const today = new Date(); // Utilise la date et l'heure actuelles
   const weekStart = new Date(today);
   weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // Calcule le lundi de la semaine actuelle
 
@@ -84,30 +85,53 @@ function InteractiveCalendar() {
     return suggestions;
   };
 
-  const addTask = () => {
+  const addTask = async () => {
     if (newTask.title && newTask.time && newTask.date) {
-      const taskToAdd = {
-        id: Date.now(),
-        ...newTask,
-        date: newTask.date,
-        time: newTask.time // Utilise directement le time sélectionné sans reformater
-      };
-      setTasks([...tasks, taskToAdd]);
-      setNewTask({
-        title: '',
-        description: '',
-        time: '',
-        date: '',
-        priority: 'medium',
-        category: 'other',
-        color: 'purple'
-      });
-      setIsModalOpen(false);
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      try {
+        const res = await fetch('http://localhost:8080/api/tasks', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(newTask)
+        });
+        if (res.ok) {
+          const savedTask = await res.json();
+          setTasks([...tasks, savedTask]);
+          setNewTask({
+            title: '',
+            description: '',
+            time: '',
+            date: '',
+            priority: 'medium',
+            category: 'other',
+            color: 'purple'
+          });
+          setIsModalOpen(false);
+        }
+      } catch (err) {
+        console.error('Failed to add task:', err);
+      }
     }
   };
 
-  const deleteTask = (taskId) => {
-    setTasks(tasks.filter(task => task.id !== taskId));
+  const deleteTask = async (taskId) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/tasks/${taskId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setTasks(tasks.filter(task => task.id !== taskId));
+      }
+    } catch (err) {
+      console.error('Failed to delete task:', err);
+    }
   };
 
   const openModal = () => {
@@ -116,22 +140,38 @@ function InteractiveCalendar() {
     setIsModalOpen(true);
   };
 
+  // --- Ajout pour la modale de détail ---
+  const openTaskDetail = (task) => setSelectedTask(task);
+  const closeTaskDetail = () => setSelectedTask(null);
+
+  useEffect(() => {
+    const fetchTasks = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) return;
+      try {
+        const res = await fetch('http://localhost:8080/api/tasks', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setTasks(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch tasks:', err);
+      }
+    };
+    fetchTasks();
+  }, []);
+
   return (
     <div className="p-1 h-full" style={{ height: '300px' }}>
       <div className="flex flex-col md:flex-row max-md:gap-1 items-center justify-between mb-2">
         <div className="flex items-center gap-1">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-          >
-            <path
-              d="M17 4.50001L17 5.15001L17 4.50001ZM6.99999 4.50002L6.99999 3.85002L6.99999 4.50002ZM8.05078 14.65C8.40977 14.65 8.70078 14.359 8.70078 14C8.70078 13.641 8.40977 13.35 8.05078 13.35V14.65ZM8.00078 13.35C7.6418 13.35 7.35078 13.641 7.35078 14C7.35078 14.359 7.6418 14.65 8.00078 14.65V13.35ZM8.05078 17.65C8.40977 17.65 8.70078 17.359 8.70078 17C8.70078 16.641 8.40977 16.35 8.05078 16.35V17.65ZM8.00078 16.35C7.6418 16.35 7.35078 16.641 7.35078 17C7.35078 17.359 7.6418 17.65 8.00078 17.65V16.35ZM12.0508 14.65C12.4098 14.65 12.7008 14.359 12.7008 14C12.7008 13.641 12.4098 13.35 12.0508 13.35V14.65ZM12.0008 13.35C11.6418 13.35 11.3508 13.641 11.3508 14C11.3508 14.359 11.6418 14.65 12.0008 14.65V13.35ZM12.0508 17.65C12.4098 17.65 12.7008 17.359 12.7008 17C12.7008 16.641 12.4098 16.35 12.0508 16.35V17.65ZM12.0008 16.35C11.6418 16.35 11.3508 16.641 11.3508 17C11.3508 17.359 11.6418 17.65 12.0008 17.65V16.35ZM16.0508 14.65C16.4098 14.65 16.7008 14.359 16.7008 14C16.7008 13.641 16.4098 13.35 16.0508 13.35V14.65ZM16.0008 13.35C15.6418 13.35 15.3508 13.641 15.3508 14C15.3508 14.359 15.6418 14.65 16.0008 14.65V13.35ZM16.0508 17.65C16.4098 17.65 16.7008 17.359 16.7008 17C16.7008 16.641 16.4098 16.35 16.0508 16.35V17.65ZM16.0008 16.35C15.6418 16.35 15.3508 16.641 15.3508 17C15.3508 17.359 15.6418 17.65 16.0008 17.65V16.35ZM8.65 3C8.65 2.64101 8.35898 2.35 8 2.35C7.64102 2.35 7.35 2.64101 7.35 3H8.65ZM7.35 6C7.35 6.35899 7.64102 6.65 8 6.65C8.35898 6.65 8.65 6.35899 8.65 6H7.35ZM16.65 3C16.65 2.64101 16.359 2.35 16 2.35C15.641 2.35 15.35 2.64101 15.35 3H16.65ZM15.35 6C15.35 6.35899 15.641 6.65 16 6.65C16.359 6.65 16.65 6.35899 16.65 6H15.35Z"
-              fill="#111827"
-            />
-          </svg>
+          <img
+            src="/calendar.png"
+            alt="Calendar Icon"
+            className="w-4 h-4"
+          />
           <h6 className="text-sm leading-5 font-semibold text-gray-900">
             {currentView === 'Day' && `Today, ${today.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`}
             {currentView === 'Week' && `Week of ${weekStart.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}`}
@@ -190,7 +230,7 @@ function InteractiveCalendar() {
             >
               <path d="M10 5V15M15 10H5" stroke="white" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
-            New Activity
+            New Task
           </button>
         </div>
       </div>
@@ -223,19 +263,20 @@ function InteractiveCalendar() {
                     {dayTasks.map((task) => (
                       <div
                         key={task.id}
-                        className={`rounded p-0.5 border-l-2 ${
+                        className={`rounded p-0.5 border-l-2 cursor-pointer ${
                           task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
                           task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
                           task.color === 'green' ? 'border-green-600 bg-green-50' :
                           'border-yellow-600 bg-yellow-50'
                         }`}
+                        onClick={() => openTaskDetail(task)}
                       >
                         <p className="text-[8px] font-normal text-gray-900 mb-px">{task.title}</p>
                         <p className="text-[6px] font-light text-gray-700">{task.description}</p>
                         <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
                         {isDeleteMode && (
                           <button
-                            onClick={() => deleteTask(task.id)}
+                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
                             className="text-[6px] text-red-500 hover:underline mt-1"
                           >
                             Delete
@@ -268,19 +309,20 @@ function InteractiveCalendar() {
                         {dayTasks.map((task) => (
                           <div
                             key={task.id}
-                            className={`rounded p-0.5 border-l-2 ${
+                            className={`rounded p-0.5 border-l-2 cursor-pointer ${
                               task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
                               task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
                               task.color === 'green' ? 'border-green-600 bg-green-50' :
                               'border-yellow-600 bg-yellow-50'
                             }`}
+                            onClick={() => openTaskDetail(task)}
                           >
                             <p className="text-[8px] font-normal text-gray-900 mb-px">{task.title}</p>
                             <p className="text-[6px] font-light text-gray-700">{task.description}</p>
                             <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
                             {isDeleteMode && (
                               <button
-                                onClick={() => deleteTask(task.id)}
+                                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
                                 className="text-[6px] text-red-500 hover:underline mt-1"
                               >
                                 Delete
@@ -342,7 +384,7 @@ function InteractiveCalendar() {
                     {dayTasks.map((task) => (
                       <div
                         key={task.id}
-                        className={`rounded p-0.5 border-l-2 ${
+                        className={`rounded p-0.5 border-l-2 cursor-pointer ${
                           task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
                           task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
                           task.color === 'green' ? 'border-green-600 bg-green-50' :
@@ -356,6 +398,7 @@ function InteractiveCalendar() {
                           transition: 'transform 0.2s ease-in-out, z-index 0.2s',
                           zIndex: 1,
                         }}
+                        onClick={() => openTaskDetail(task)}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'scale(1.2)';
                           e.currentTarget.style.zIndex = 10; // Passe au premier plan
@@ -370,7 +413,7 @@ function InteractiveCalendar() {
                         <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
                         {isDeleteMode && (
                           <button
-                            onClick={() => deleteTask(task.id)}
+                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
                             className="text-[6px] text-red-500 hover:underline mt-1"
                           >
                             Delete
@@ -386,6 +429,7 @@ function InteractiveCalendar() {
         )}
       </div>
 
+      {/* Modale d'ajout de tâche */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-white/20 backdrop-blur-md backdrop-saturate-150 flex items-center justify-center z-[70]">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4">
@@ -480,6 +524,56 @@ function InteractiveCalendar() {
                   Add Task
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modale de détail de tâche */}
+      {selectedTask && (
+        <div
+          className="absolute inset-0 bg-transparent flex items-center justify-center z-[100]"
+          style={{ pointerEvents: 'auto' }}
+        >
+          <div
+            className={`rounded-xl shadow-2xl w-full max-w-md p-6 relative ${
+              selectedTask.color === 'purple'
+                ? 'bg-purple-50 border-l-4 border-purple-600'
+                : selectedTask.color === 'blue'
+                ? 'bg-blue-50 border-l-4 border-blue-600'
+                : selectedTask.color === 'green'
+                ? 'bg-green-50 border-l-4 border-green-600'
+                : 'bg-yellow-50 border-l-4 border-yellow-600'
+            }`}
+            style={{
+              boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <button
+              onClick={closeTaskDetail}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
+            >
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+            <h2 className="text-xl font-bold mb-2 text-indigo-700">{selectedTask.title}</h2>
+            <p className="mb-2 text-gray-700">{selectedTask.description}</p>
+            <div className="mb-1 text-sm text-gray-500">
+              <strong>Date:</strong> {selectedTask.date}
+            </div>
+            <div className="mb-1 text-sm text-gray-500">
+              <strong>Time:</strong> {selectedTask.time}
+            </div>
+            <div className="mb-1 text-sm text-gray-500">
+              <strong>Priority:</strong> {selectedTask.priority}
+            </div>
+            <div className="mb-1 text-sm text-gray-500">
+              <strong>Category:</strong> {selectedTask.category}
+            </div>
+            <div className="mb-1 text-sm text-gray-500">
+              <strong>Color:</strong> {selectedTask.color}
             </div>
           </div>
         </div>

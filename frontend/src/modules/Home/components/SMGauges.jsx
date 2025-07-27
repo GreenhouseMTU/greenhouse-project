@@ -131,15 +131,22 @@ function getAlertBox(valueSM, valueEC) {
 
   let alertStyle = '';
   let alertText = '';
+
   if (valueSM < 20 && valueEC < 0.5) {
     alertStyle = "bg-red-100 border border-red-400 text-red-700";
-    alertText = "🌵💧 Soil too dry and low conductivity: remember to water and add nutrients!";
+    alertText = "🌵 Low moisture & low conductivity:\nDry and nutrient-poor soil.\n💧➡️ Water and fertilize!";
   } else if (valueSM > 60 && valueEC > 1.5) {
     alertStyle = "bg-yellow-100 border border-yellow-400 text-yellow-700";
-    alertText = "🌧️🧂 Soil too wet and high conductivity: risk of waterlogging, reduce watering!";
+    alertText = "🌊 High moisture & high conductivity:\nRisk of waterlogging or salt buildup.\n⛔ Reduce watering!";
+  } else if (valueSM > 60 && valueEC < 0.6) {
+    alertStyle = "bg-orange-100 border border-orange-400 text-orange-700";
+    alertText = "🧐 Wet soil with low conductivity:\nSoil might be poor in nutrients.\n🧪 Check fertilizer levels.";
+  } else if (valueSM < 25 && valueEC > 1.5) {
+    alertStyle = "bg-pink-100 border border-pink-400 text-pink-700";
+    alertText = "⚠️ Dry soil with high EC:\nPossible salt accumulation or compaction.\n🚿 Water slowly.";
   } else {
     alertStyle = "bg-green-100 border border-green-400 text-green-700";
-    alertText = "🌱✅ Soil OK! Parameters correct.";
+    alertText = "✅ Balanced moisture & EC:\nSoil is in healthy range.\n🌱 Keep monitoring!";
   }
 
   return (
@@ -148,6 +155,7 @@ function getAlertBox(valueSM, valueEC) {
     </div>
   );
 }
+
 
 export default function SMGauges() {
   const [selectedSensor, setSelectedSensor] = useState(1);

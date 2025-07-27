@@ -1,3 +1,10 @@
+html, body {
+  margin: 0;
+  padding: 0;
+
+}
+
+
 /* Styling the sidebar (ribbon) on the left */
 .highlight-sidebar {
   background-color: #9DC08B;
@@ -209,3 +216,7 @@
 
 
 
+/* Pour les écrans de PC portables (1366px ou moins) */
+@media (max-width: 1200px) {
+
+}

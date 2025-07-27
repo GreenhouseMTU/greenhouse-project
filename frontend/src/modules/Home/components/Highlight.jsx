@@ -37,6 +37,7 @@ function Highlight() {
   const [exportFormat, setExportFormat] = useState('csv');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState('all');
+  const [insights, setInsights] = useState('');
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -78,6 +79,29 @@ function Highlight() {
     };
 
     fetchAll();
+  }, [navigate]);
+
+  useEffect(() => {
+    const fetchInsights = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        navigate('/login', { state: { mode: 'login' } });
+        return;
+      }
+
+      try {
+        const headers = { Authorization: `Bearer ${token}` };
+        const response = await fetch('http://localhost:8080/api/sensors/sensor_co2temphum_int/insights', { headers });
+        const data = await response.json();
+        console.log('Insights:', data.summary); // Debug log
+        setInsights(data.summary);
+      } catch (err) {
+        console.error('Error fetching insights:', err);
+        setInsights('Failed to fetch insights.');
+      }
+    };
+
+    fetchInsights();
   }, [navigate]);
 
   const generateInsights = (type, data) => {
@@ -279,23 +303,24 @@ function Highlight() {
           <div className="rounded-2xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-white/[0.03]">
             <SMGauges />
           </div>
-          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 revenue-users-card">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 revenue-users-card relative">
             <InteractiveCalendar />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-4 mb-6">
-          <div className="col-span-2">
+          <div className="col-span-2 ">
             <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03] relative">
               <MapContainer
                 center={[51.8856, -8.5360]}
                 zoom={30}
                 scrollWheelZoom={false}
-                style={{ height: '500px', width: '100%', zIndex: 0  }}
+                style={{ height: '500px', width: '100%', zIndex: 0 }}
                 className="rounded-2xl"
+                attributionControl={false}
               >
                 <TileLayer
                   url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                  attribution='© Esri — Source: Esri, Maxar, Earthstar Geographics'
+                  attribution=''
                 />
                 <Marker position={[51.8856, -8.5360]}>
                   <Popup>Greenhouse MTU</Popup>
@@ -305,7 +330,129 @@ function Highlight() {
             </div>
           </div>
           <div className="col-span-1 flex flex-col gap-6">
-            {renderInsights().slice(0, 2)}
+            <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6">
+              <h2 className="text-xl font-semibold mb-4 text-black text-center">Insights (3 days)</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Carte pour la température */}
+                <div className="rounded-xl bg-orange-50 border border-orange-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 min-h-[300px] flex flex-col justify-between">
+                  {Array.isArray(insights) && insights[0] ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-orange-500 text-center">{insights[0].title}</h3>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-4">
+                        {insights[0].data.split(' ')[0]} {/* Première valeur */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[0].data.split(' ')[1]} {/* Flèche */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[0].data.split(' ')[2]} {/* Deuxième valeur */}
+                      </p>
+                      <h4 className="text-lg font-semibold text-orange-600 dark:text-gray-400 text-center mt-4">
+                        {insights[0].overallTitle}
+                      </h4>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-2">
+                        {insights[0].overallData}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-gray-500 italic text-center">Loading...</p>
+                  )}
+                </div>
+
+                {/* Carte pour l'humidité */}
+                <div className="rounded-xl bg-blue-50 border border-blue-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 min-h-[300px] flex flex-col justify-between">
+                  {Array.isArray(insights) && insights[1] ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-blue-500 text-center">{insights[1].title}</h3>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-4">
+                        {insights[1].data.split(' ')[0]} {/* Première valeur */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[1].data.split(' ')[1]} {/* Flèche */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[1].data.split(' ')[2]} {/* Deuxième valeur */}
+                      </p>
+                      <h4 className="text-lg font-semibold text-blue-600 dark:text-gray-400 text-center mt-4">
+                        {insights[1].overallTitle}
+                      </h4>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-2">
+                        {insights[1].overallData}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-gray-500 italic text-center">Loading...</p>
+                  )}
+                </div>
+
+                {/* Carte pour le CO₂ */}
+                <div className="rounded-xl bg-green-50 border border-gray-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 min-h-[300px] flex flex-col justify-between">
+                  {Array.isArray(insights) && insights[2] ? (
+                    <>
+                      <h3 className="text-lg font-semibold text-green-500 text-center">{insights[2].title}</h3>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-4">
+                        {insights[2].data.split(' ')[0]} {/* Première valeur */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[2].data.split(' ')[1]} {/* Flèche */}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                        {insights[2].data.split(' ')[2]} {/* Deuxième valeur */}
+                      </p>
+                      <h4 className="text-lg font-semibold text-green-600 dark:text-gray-400 text-center mt-4">
+                        {insights[2].overallTitle}
+                      </h4>
+                      <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-2">
+                        {insights[2].overallData}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-gray-500 italic text-center">Loading...</p>
+                  )}
+                </div>
+
+                {/* Nouvelle carte pour les recommandations */}
+                <div className="rounded-xl bg-gray-50 border border-gray-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 md:col-span-3">
+                  <div className="grid grid-cols-3 divide-x divide-gray-300">
+                    {/* Section Température */}
+                    <div className="px-4">
+                      <h4 className="text-md font-semibold text-orange-500 text-center mb-2">Temperature</h4>
+                      {Array.isArray(insights) && insights[0]?.recommendation ? (
+                        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                          {insights[0].recommendation}
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 italic text-center">No recommendations available.</p>
+                      )}
+                    </div>
+
+                    {/* Section Humidity */}
+                    <div className="px-4">
+                      <h4 className="text-md font-semibold text-blue-500 text-center mb-2">Humidity</h4>
+                      {Array.isArray(insights) && insights[1]?.recommendation ? (
+                        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                          {insights[1].recommendation}
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 italic text-center">No recommendations available.</p>
+                      )}
+                    </div>
+
+                    {/* Section CO₂ */}
+                    <div className="px-4">
+                      <h4 className="text-md font-semibold text-green-500 text-center mb-2">CO₂</h4>
+                      {Array.isArray(insights) && insights[2]?.recommendation ? (
+                        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                          {insights[2].recommendation}
+                        </p>
+                      ) : (
+                        <p className="text-gray-500 italic text-center">No recommendations available.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] md:p-6 mb-6 h-64">

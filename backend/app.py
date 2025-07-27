@@ -21,7 +21,7 @@ def create_app():
     CORS(app, resources={r"/api/*": {"origins": "http://localhost:8079"}})
 
     # Database config
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:adminNIMBUS-1@db:3306/greenhouse'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:adminNIMBUS-1@localhost:3306/greenhouse'
     app.config['JWT_SECRET_KEY'] = 'tHe_greeN_House_KEY'
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=6)
 
@@ -118,6 +118,51 @@ def create_app():
 
         from sensors.sensorSMTempEC_4 import sensor_smtempec_4_app
         app.register_blueprint(sensor_smtempec_4_app)
+
+    # --- Gestion des tâches utilisateur ---
+    from flask_jwt_extended import jwt_required, get_jwt_identity
+    from models import Task
+
+    tasks_app = Blueprint('tasks_app', __name__)
+
+    @tasks_app.route('/api/tasks', methods=['GET'])
+    @jwt_required()
+    def get_tasks():
+        user_id = get_jwt_identity()
+        tasks = Task.query.filter_by(user_id=user_id).all()
+        return jsonify([task.serialize() for task in tasks])
+
+    @tasks_app.route('/api/tasks', methods=['POST'])
+    @jwt_required()
+    def add_task():
+        user_id = get_jwt_identity()
+        data = request.json
+        task = Task(
+            title=data['title'],
+            description=data.get('description', ''),
+            date=data['date'],
+            time=data['time'],
+            priority=data.get('priority', 'medium'),
+            category=data.get('category', 'other'),
+            color=data.get('color', 'purple'),
+            user_id=user_id
+        )
+        db.session.add(task)
+        db.session.commit()
+        return jsonify(task.serialize()), 201
+
+    @tasks_app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
+    @jwt_required()
+    def delete_task(task_id):
+        user_id = get_jwt_identity()
+        task = Task.query.filter_by(id=task_id, user_id=user_id).first()
+        if not task:
+            return jsonify({'error': 'Task not found'}), 404
+        db.session.delete(task)
+        db.session.commit()
+        return jsonify({'result': 'deleted'})
+
+    app.register_blueprint(tasks_app)
 
     return app
 

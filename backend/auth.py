@@ -27,16 +27,26 @@ def add_user():
 
     return jsonify({'message': 'User added successfully'}), 201
 
-# Login
-@auth_app.route('/api/login', methods=['POST'])
+@auth_app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'CORS preflight successful'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8079')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        return response
+
     username = request.json.get('username')
     password = request.json.get('password')
 
     user = db.session.query(User).filter_by(username=username).first()
 
     if user and user.check_password(password):
-        access_token = create_access_token(identity=user.username)
-        return jsonify({'access_token': access_token}), 200
+        access_token = create_access_token(identity=user.id)
+        response = jsonify({'access_token': access_token})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8079')
+        return response
     else:
-        return jsonify({'message': 'Invalid credentials'}), 401
+        response = jsonify({'message': 'Invalid credentials'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8079')
+        return response, 401

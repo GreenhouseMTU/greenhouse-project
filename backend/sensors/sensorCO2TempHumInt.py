@@ -3,6 +3,10 @@ from datetime import datetime, timedelta, date, time
 from flask_jwt_extended import jwt_required
 from models import Sensor_CO2TempHum_int
 from db import db
+import subprocess
+import json
+import math
+
 
 sensor_co2temphum_int_app = Blueprint('sensor_co2temphum_int_app', __name__)
 
@@ -232,3 +236,158 @@ def get_sensorCO2TempHumIntMonth():
 
     return jsonify(results)
 
+# Récupérer les données des 3 derniers jours
+@sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/last_3_days', methods=['GET'])
+@jwt_required()
+def get_sensorCO2TempHumIntLast3Days():
+    current_date = datetime.now()
+    start_date = current_date - timedelta(days=3)
+
+    
+    data_entries = db.session.query(Sensor_CO2TempHum_int).filter(
+        Sensor_CO2TempHum_int.datetime >= start_date,
+        Sensor_CO2TempHum_int.datetime <= current_date
+    ).order_by(Sensor_CO2TempHum_int.datetime.asc()).all()
+
+    # Sérialiser les données
+    results = [
+        {
+            'datetime': entry.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+            'valueCO2': entry.valueCO2,
+            'valueTemp': entry.valueTemp,
+            'valueHum': entry.valueHum
+        }
+        for entry in data_entries
+    ]
+
+    return jsonify(results)
+
+# analyser les tendances des données extraites
+def analyze_trends(data):
+    trends = {}
+    temps = [entry['valueTemp'] for entry in data]
+    hums = [entry['valueHum'] for entry in data]
+    co2s = [entry['valueCO2'] for entry in data]
+
+    # Calculer les moyennes quotidiennes
+    daily_data = {}
+    for entry in data:
+        date_str = entry['datetime'].split(' ')[0]
+        if date_str not in daily_data:
+            daily_data[date_str] = {'temps': [], 'hums': [], 'co2s': []}
+        daily_data[date_str]['temps'].append(entry['valueTemp'])
+        daily_data[date_str]['hums'].append(entry['valueHum'])
+        daily_data[date_str]['co2s'].append(entry['valueCO2'])
+
+    daily_averages = {}
+    for date, values in daily_data.items():
+        daily_averages[date] = {
+            'average_temp': round(sum(values['temps']) / len(values['temps']), 2),
+            'average_hum': round(sum(values['hums']) / len(values['hums']), 2),
+            'average_co2': round(sum(values['co2s']) / len(values['co2s']), 2)
+        }
+
+    # Calculer les moyennes des 3 derniers jours
+    sorted_dates = sorted(daily_averages.keys())[-3:]  # Les 3 derniers jours
+    three_day_temps = [daily_averages[date]['average_temp'] for date in sorted_dates]
+    three_day_hums = [daily_averages[date]['average_hum'] for date in sorted_dates]
+    three_day_co2s = [daily_averages[date]['average_co2'] for date in sorted_dates]
+
+    def compute_stats(values):
+        if not values:
+            return {"average": 0, "variability": "±0.00"}
+        average = round(sum(values) / len(values), 2)
+        variance = sum((x - average) ** 2 for x in values) / len(values)
+        std_dev = round(math.sqrt(variance), 2)
+        return {
+            "average": average,
+            "variability": f"±{std_dev}"
+        }
+
+    # Détecter les tendances
+    def detect_trend(metric, values):
+        start = values[0]
+        end = values[-1]
+        stats = compute_stats(values)
+        trend = "stable"
+        if end > start:
+            trend = "rising"
+        elif end < start:
+            trend = "falling"
+        return {
+            "trend": trend,
+            "start": start,
+            "end": end,
+            "overall_average": stats["average"],
+            "variability": stats["variability"]
+        }
+
+    trends['temperature'] = detect_trend('Temp', three_day_temps)
+    trends['humidity'] = detect_trend('Hum', three_day_hums)
+    trends['co2'] = detect_trend('CO2', three_day_co2s)
+
+    # Ajouter les moyennes quotidiennes pour référence
+    trends['daily_averages'] = daily_averages
+    return trends
+
+
+def generate_summary(trends):
+    trends_json = json.dumps(trends)  # Convertit les tendances en JSON
+    print(f"JSON passed to Node.js: {trends_json}")  # Log pour vérifier les données
+
+    try:
+        result = subprocess.run(
+            ['node', 'generateSummary.js'],
+            input=trends_json,  # Passe le JSON en entrée standard (stdin)
+            capture_output=True,
+            text=True,
+            encoding='utf-8',  # Force l'encodage UTF-8
+            cwd=r'd:\malea\Bureau\Clone\greenhouse-master\backend'  # Chemin absolu vers le script
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout.strip())  # Parse le tableau JSON renvoyé par Node.js
+        else:
+            print(f"Node.js script error: {result.stderr}")
+            raise Exception(f"Node.js script error: {result.stderr}")
+    except Exception as e:
+        print(f"Error generating summary: {e}")
+        return ["Error generating summary."]
+
+
+@sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/insights', methods=['GET'])
+@jwt_required()
+def get_sensorCO2TempHumIntInsights():
+    # Extraire les données des 3 derniers jours
+    current_date = datetime.now()
+    start_date = current_date - timedelta(days=3)
+
+    data_entries = db.session.query(Sensor_CO2TempHum_int).filter(
+        Sensor_CO2TempHum_int.datetime >= start_date,
+        Sensor_CO2TempHum_int.datetime <= current_date
+    ).order_by(Sensor_CO2TempHum_int.datetime.asc()).all()
+
+    # Sérialiser les données
+    data = [
+        {
+            'datetime': entry.datetime.strftime('%Y-%m-%d %H:%M:%S'),
+            'valueCO2': entry.valueCO2,
+            'valueTemp': entry.valueTemp,
+            'valueHum': entry.valueHum
+        }
+        for entry in data_entries
+    ]
+
+    # Analyser les tendances
+    trends = analyze_trends(data)
+
+    # Récupérer les moyennes quotidiennes via l'endpoint week
+    weekly_data = get_sensorCO2TempHumIntWeek().json
+    trends['daily_averages'] = weekly_data
+
+    # Générer le résumé
+    summary = generate_summary(trends)
+
+    return jsonify({
+        'summary': summary,
+        'trends': trends
+    })
