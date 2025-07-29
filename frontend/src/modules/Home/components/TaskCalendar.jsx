@@ -4,7 +4,6 @@ function InteractiveCalendar() {
   const [tasks, setTasks] = useState([]);
   const [currentView, setCurrentView] = useState('Week');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteMode, setIsDeleteMode] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -195,29 +194,6 @@ function InteractiveCalendar() {
 
         <div className="flex items-center gap-2">
           <button
-            className={`py-1 pr-2 pl-1 rounded-lg flex items-center gap-0.5 text-xs font-semibold transition-all duration-300 ${
-              isDeleteMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-            onClick={() => setIsDeleteMode(!isDeleteMode)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 20 20"
-              fill="none"
-            >
-              <path
-                d="M6 6L14 14M6 14L14 6"
-                stroke={isDeleteMode ? 'white' : 'currentColor'}
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-            {isDeleteMode ? 'Cancel' : 'Delete Mode'}
-          </button>
-
-          <button
             className="py-1 pr-2 pl-1 bg-indigo-600 rounded-lg flex items-center gap-0.5 text-xs font-semibold text-white transition-all duration-300 hover:bg-indigo-700"
             onClick={openModal}
           >
@@ -264,24 +240,22 @@ function InteractiveCalendar() {
                       <div
                         key={task.id}
                         className={`rounded p-0.5 border-l-2 cursor-pointer ${
-                          task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
-                          task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
-                          task.color === 'green' ? 'border-green-600 bg-green-50' :
-                          'border-yellow-600 bg-yellow-50'
+                          task.priority === 'high'
+                            ? 'border-red-600 bg-red-50'
+                            : task.priority === 'medium'
+                            ? 'border-orange-500 bg-orange-50'
+                            : 'border-green-600 bg-green-50'
                         }`}
                         onClick={() => openTaskDetail(task)}
                       >
                         <p className="text-[8px] font-normal text-gray-900 mb-px">{task.title}</p>
-                        <p className="text-[6px] font-light text-gray-700">{task.description}</p>
+                        <p
+                          className="text-[6px] font-light text-gray-700 break-words overflow-hidden whitespace-nowrap text-ellipsis"
+                          title={task.description}
+                        >
+                          {task.description}
+                        </p>
                         <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
-                        {isDeleteMode && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                            className="text-[6px] text-red-500 hover:underline mt-1"
-                          >
-                            Delete
-                          </button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -310,24 +284,22 @@ function InteractiveCalendar() {
                           <div
                             key={task.id}
                             className={`rounded p-0.5 border-l-2 cursor-pointer ${
-                              task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
-                              task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
-                              task.color === 'green' ? 'border-green-600 bg-green-50' :
-                              'border-yellow-600 bg-yellow-50'
+                              task.priority === 'high'
+                                ? 'border-red-600 bg-red-50'
+                                : task.priority === 'medium'
+                                ? 'border-orange-500 bg-orange-50'
+                                : 'border-green-600 bg-green-50'
                             }`}
                             onClick={() => openTaskDetail(task)}
                           >
                             <p className="text-[8px] font-normal text-gray-900 mb-px">{task.title}</p>
-                            <p className="text-[6px] font-light text-gray-700">{task.description}</p>
+                            <p
+                              className="text-[6px] font-light text-gray-700 break-words overflow-hidden whitespace-nowrap text-ellipsis"
+                              title={task.description}
+                            >
+                              {task.description}
+                            </p>
                             <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
-                            {isDeleteMode && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                                className="text-[6px] text-red-500 hover:underline mt-1"
-                              >
-                                Delete
-                              </button>
-                            )}
                           </div>
                         ))}
                       </div>
@@ -385,10 +357,11 @@ function InteractiveCalendar() {
                       <div
                         key={task.id}
                         className={`rounded p-0.5 border-l-2 cursor-pointer ${
-                          task.color === 'purple' ? 'border-purple-600 bg-purple-50' :
-                          task.color === 'blue' ? 'border-blue-600 bg-blue-50' :
-                          task.color === 'green' ? 'border-green-600 bg-green-50' :
-                          'border-yellow-600 bg-yellow-50'
+                          task.priority === 'high'
+                            ? 'border-red-600 bg-red-50'
+                            : task.priority === 'medium'
+                            ? 'border-orange-500 bg-orange-50'
+                            : 'border-green-600 bg-green-50'
                         }`}
                         style={{
                           position: 'absolute',
@@ -409,16 +382,13 @@ function InteractiveCalendar() {
                         }}
                       >
                         <p className="text-[8px] font-normal text-gray-900 mb-px">{task.title}</p>
-                        <p className="text-[6px] font-light text-gray-700">{task.description}</p>
+                        <p
+                          className="text-[6px] font-light text-gray-700 break-words overflow-hidden whitespace-nowrap text-ellipsis"
+                          title={task.description}
+                        >
+                          {task.description}
+                        </p>
                         <p className="text-[6px] font-semibold text-gray-900">{task.time}</p>
-                        {isDeleteMode && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteTask(task.id); }}
-                            className="text-[6px] text-red-500 hover:underline mt-1"
-                          >
-                            Delete
-                          </button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -482,7 +452,7 @@ function InteractiveCalendar() {
                   <select
                     value={newTask.time}
                     onChange={(e) => setNewTask({ ...newTask, time: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
+                    className="task-form-select w-full px-3 py-2 text-base text-black rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
                     required
                   >
                     <option value="">Select Time</option>
@@ -499,7 +469,7 @@ function InteractiveCalendar() {
                 <select
                   value={newTask.priority}
                   onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
+                  className="task-form-select w-full px-3 py-2 text-base text-black rounded-lg focus:border-indigo-500 focus:outline-none transition-colors"
                   required
                 >
                   <option value="low">Low Priority</option>
@@ -537,13 +507,11 @@ function InteractiveCalendar() {
         >
           <div
             className={`rounded-xl shadow-2xl w-full max-w-md p-6 relative ${
-              selectedTask.color === 'purple'
-                ? 'bg-purple-50 border-l-4 border-purple-600'
-                : selectedTask.color === 'blue'
-                ? 'bg-blue-50 border-l-4 border-blue-600'
-                : selectedTask.color === 'green'
-                ? 'bg-green-50 border-l-4 border-green-600'
-                : 'bg-yellow-50 border-l-4 border-yellow-600'
+              selectedTask.priority === 'high'
+                ? 'bg-red-50 border-l-4 border-red-600'
+                : selectedTask.priority === 'medium'
+                ? 'bg-orange-50 border-l-4 border-orange-500'
+                : 'bg-green-50 border-l-4 border-green-600'
             }`}
             style={{
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
@@ -558,8 +526,16 @@ function InteractiveCalendar() {
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
               </svg>
             </button>
-            <h2 className="text-xl font-bold mb-2 text-indigo-700">{selectedTask.title}</h2>
-            <p className="mb-2 text-gray-700">{selectedTask.description}</p>
+            <h2 className={`text-xl font-bold mb-2 ${
+              selectedTask.priority === 'high'
+                ? 'text-red-600'
+                : selectedTask.priority === 'medium'
+                ? 'text-orange-500'
+                : 'text-green-600'
+            }`}>
+              {selectedTask.title}
+            </h2>
+            <p className="mb-2 text-gray-700 break-words whitespace-pre-line max-h-32 overflow-auto">{selectedTask.description}</p>
             <div className="mb-1 text-sm text-gray-500">
               <strong>Date:</strong> {selectedTask.date}
             </div>
@@ -569,12 +545,15 @@ function InteractiveCalendar() {
             <div className="mb-1 text-sm text-gray-500">
               <strong>Priority:</strong> {selectedTask.priority}
             </div>
-            <div className="mb-1 text-sm text-gray-500">
-              <strong>Category:</strong> {selectedTask.category}
-            </div>
-            <div className="mb-1 text-sm text-gray-500">
-              <strong>Color:</strong> {selectedTask.color}
-            </div>
+            <button
+              onClick={() => {
+                deleteTask(selectedTask.id);
+                closeTaskDetail();
+              }}
+              className="mt-4 w-full py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-semibold"
+            >
+              Delete Task
+            </button>
           </div>
         </div>
       )}

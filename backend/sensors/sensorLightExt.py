@@ -102,8 +102,8 @@ def get_sensorLightExtDay():
 @jwt_required()
 def get_sensorLightExtWeek():
     offset = int(request.args.get('offset', 0))
-    today = datetime.now().date() + timedelta(days=offset * 7)
-    monday = today - timedelta(days=today.weekday())
+    today = datetime.now().date()
+    monday = today - timedelta(days=today.weekday()) + timedelta(weeks=offset)
     sunday = monday + timedelta(days=6)
     start_date = datetime.combine(monday, datetime.min.time())
     end_date = datetime.combine(sunday, datetime.max.time())

@@ -283,9 +283,10 @@ function Dashboard() {
   }
 
   const getWeekLabel = (offset) => {
-    const now = new Date();
-    // Trouve le lundi de la semaine courante
-    const monday = new Date(now.setDate(now.getDate() - now.getDay() + 1 + offset * 7));
+    const today = new Date();
+    const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay();
+    const monday = new Date(today);
+    monday.setDate(today.getDate() - (dayOfWeek - 1) + offset * 7);
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
     return `Week (${monday.getDate()}/${monday.getMonth() + 1} - ${sunday.getDate()}/${sunday.getMonth() + 1})`;
@@ -529,7 +530,10 @@ function Dashboard() {
 
     const getWeekDates = (offset = 0) => {
       const today = new Date();
-      const monday = new Date(today.setDate(today.getDate() - today.getDay() + 1 + offset * 7));
+      // JS: 0=dimanche, 1=lundi, ..., 6=samedi
+      const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); // dimanche=7
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - (dayOfWeek - 1) + offset * 7);
       return Array.from({ length: 7 }, (_, i) => {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
@@ -932,6 +936,9 @@ function Dashboard() {
         }
       });
 
+      // Ajoute ce log ici, juste avant le return :
+      console.log('WEEK DEBUG', { type, categories, series });
+
       return {
         ...baseOptions,
         chart: { ...baseOptions.chart, type: 'line' },
@@ -1087,8 +1094,6 @@ function Dashboard() {
           xDateFormat: '%Y-%m-%d %H:%M:%S',
           shared: true
         },
-        navigator: { enabled: true },
-        rangeSelector: { enabled: false },
         series
       };
     }
@@ -1096,6 +1101,7 @@ function Dashboard() {
     if (period[type] === 'day-average') {
       const datasets = mode === 'all' ? arr : arr.filter(s => s.mode === mode);
       datasets.forEach(({ mode: m, data }) => {
+        console.log('DATA DEBUG', { type, mode: m, data }); // Ajoute ce log ici
         const colorIndex = type === 'soil' ? parseInt(m) - 1 : (m === 'ext' ? 0 : 1);
         if (type === 'light') {
           series.push({
@@ -1139,12 +1145,11 @@ function Dashboard() {
           );
         }
         if (type === 'soil' && ['1', '2', '3', '4'].includes(m)) {
-          const soilIndex = parseInt(m) - 1;
           series.push(
             {
               name: `Soil ${m} Moist`,
               data: data.map(item => item.average_valueSM || 0),
-              color: colorMap.soil[soilIndex],
+              color: colorMap.soil[colorIndex],
               yAxis: 0,
               visible: true,
               showInLegend: true,
@@ -1153,7 +1158,7 @@ function Dashboard() {
             {
               name: `Soil ${m} Temp`,
               data: data.map(item => item.average_valueTemp || 0),
-              color: colorMap.soil[soilIndex],
+              color: colorMap.soil[colorIndex],
               yAxis: 1,
               visible: true,
               showInLegend: true,
@@ -1162,7 +1167,7 @@ function Dashboard() {
             {
               name: `Soil ${m} EC`,
               data: data.map(item => item.average_valueEC || 0),
-              color: colorMap.soil[soilIndex],
+              color: colorMap.soil[colorIndex],
               yAxis: 2,
               visible: true,
               showInLegend: true,
@@ -1438,7 +1443,7 @@ function Dashboard() {
             if (k === 'mode') return 'Mode';
             if (k === 'datetime' || k === 'date') return 'Timestamp';
             if (k === 'hour') return 'Hour';
-            if (k === 'period') return 'Period';
+            if (k === 'period' ) return 'Period';
             let fieldKey = k;
             let prefix = '';
             if (k.startsWith('max_day_')) {

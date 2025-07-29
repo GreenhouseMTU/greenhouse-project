@@ -1,67 +1,63 @@
-const { NlgLib } = require('rosaenlg');
-
 function generateSummary(trends) {
-    const nlg = new NlgLib({ language: 'en_US' });
-
     const summary = [];
 
     const { temperature, humidity, co2 } = trends;
 
-    // Fonction pour déterminer la flèche 
     const getArrow = (start, end) => (end > start ? '↯' : '↯');
 
-
-    // Recommendations based on greenhouse thresholds
-    const getTemperatureRecommendation = (overallAverage) => {
-        if (overallAverage > 30) return '🌡️ Too hot. Increase ventilation or shading.';
-        if (overallAverage < 20) return '🔥 Too cold. Consider heating.';
-        return '👍 Temperature is optimal.';
+    const getTemperatureRecommendation = (average) => {
+        if (average > 30) return '🔥 Too hot. Increase ventilation or shading.';
+        if (average < 20) return '❄️ Too cold. Consider heating.';
+        return '✅ Temperature is optimal.';
     };
 
-
-    const getHumidityRecommendation = (overallAverage) => {
-        if (overallAverage > 70) return '💧 High humidity. Increase ventilation.';
-        if (overallAverage < 50) return '🌬️ Low humidity. Add water.';
-        return '👍 Humidity is optimal.';
+    const getHumidityRecommendation = (average) => {
+        if (average > 70) return '💧 High humidity. Increase ventilation.';
+        if (average < 50) return '🌬️ Low humidity. Add water.';
+        return '✅ Humidity is optimal.';
     };
 
-
-
-    const getCO2Recommendation = (overallAverage) => {
-        if (overallAverage > 1000) return '🫁 High CO₂ levels. Ventilate the greenhouse.';
-        if (overallAverage < 400) return '🌿 Low CO₂ levels. Consider adding CO₂.';
-        return '👍 CO₂ levels are optimal.';
+    const getCO2Recommendation = (average) => {
+        if (average > 1000) return '🚨 High CO₂ levels. Ventilate the greenhouse.';
+        if (average < 400) return '🌿 Low CO₂ levels. Consider adding CO₂.';
+        return '✅ CO₂ levels are optimal.';
     };
 
-    // Température
+    const round = (value) =>
+        value !== undefined && value !== null
+            ? Math.round(value * 10) / 10
+            : null;
+
     summary.push({
         title: 'Daily Temperature :',
-        data: `${temperature.start}°C ${getArrow(temperature.start, temperature.end)} ${temperature.end}°C `,
+        data: `${round(temperature.start)}°C ${getArrow(temperature.start, temperature.end)} ${round(temperature.end)}°C`,
         overallTitle: 'Overall Avg :',
-        overallData: `${temperature.overall_average}°C (${temperature.variability})`,
-        recommendation: getTemperatureRecommendation(temperature.overall_average) // Utilisation de overall_average
+        overallAverage: `${round(temperature.overall_average)}°C`,
+        variability: temperature.variability,
+        recommendation: getTemperatureRecommendation(temperature.average),
     });
 
-    // Humidité
     summary.push({
         title: 'Daily Humidity :',
-        data: `${humidity.start}% ${getArrow(humidity.start, humidity.end)} ${humidity.end}%`,
+        data: `${round(humidity.start)}% ${getArrow(humidity.start, humidity.end)} ${round(humidity.end)}%`,
         overallTitle: 'Overall Avg :',
-        overallData: `${humidity.overall_average}% (${humidity.variability})`,
-        recommendation: getHumidityRecommendation(humidity.overall_average) // Utilisation de overall_average
+        overallAverage: `${round(humidity.overall_average)}%`,
+        variability: humidity.variability,
+        recommendation: getHumidityRecommendation(humidity.average),
     });
 
-    // CO2
     summary.push({
         title: 'Daily CO₂ :',
-        data: `${co2.start}ppm ${getArrow(co2.start, co2.end)} ${co2.end}ppm`,
+        data: `${round(co2.start)}ppm ${getArrow(co2.start, co2.end)} ${round(co2.end)}ppm`,
         overallTitle: 'Overall Avg :',
-        overallData: `${co2.overall_average}ppm (${co2.variability})`,
-        recommendation: getCO2Recommendation(co2.overall_average) // Utilisation de overall_average
+        overallAverage: `${round(co2.overall_average)}ppm`,
+        variability: co2.variability,
+        recommendation: getCO2Recommendation(co2.average),
     });
 
     return summary;
 }
+
 
 // Lire les données depuis stdin
 let input = '';
