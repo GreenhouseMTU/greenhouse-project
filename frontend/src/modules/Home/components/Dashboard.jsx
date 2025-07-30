@@ -24,10 +24,10 @@ const DATA_MODES = [
 
 
 const SensorStatusWidget = ({ type, sensors, mode, period }) => {
-  // Log pour déboguer
+  // Log 
   console.log('SensorStatusWidget:', { type, period: period[type], mode, sensors: sensors[type] });
 
-  // Ne rien afficher si la période pour ce type n'est pas 'full-day'
+  
   if (period[type] !== 'full-day') {
     console.log(`Skipping widget for ${type}, period is ${period[type]}, not 'full-day'`);
     return null;
@@ -38,7 +38,7 @@ const SensorStatusWidget = ({ type, sensors, mode, period }) => {
       console.log(`No valid data for ${type}, mode ${data?.mode || 'unknown'}:`, data);
       return { isActive: false, duration: 'N/A' };
     }
-    // Interpréter datetime comme une date locale (IST, pas UTC)
+    
     const latest = new Date(data[data.length - 1].datetime);
     const now = new Date();
     const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
@@ -70,7 +70,7 @@ const SensorStatusWidget = ({ type, sensors, mode, period }) => {
 
 
 
-// Composant pour navigation semaine/mois
+// Composant for navigation 
 function PeriodNav({ periodType, offset, setOffset, label }) {
   return (
     <div className="week-controls">
@@ -104,7 +104,7 @@ function Dashboard() {
   const [exportFormat, setExportFormat] = useState('csv');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Offsets pour chaque section et chaque période
+  // Offsets for each section and each period
   const [weekOffset, setWeekOffset] = useState({ light: 0, env: 0, soil: 0 });
   const [monthOffset, setMonthOffset] = useState({ light: 0, env: 0, soil: 0 });
 
@@ -255,7 +255,7 @@ function Dashboard() {
     navigate
   ]);
 
-  // Ajoute ce useEffect pour restaurer la position après chargement :
+  // useEffect for restoring scroll position after loading:
   useEffect(() => {
     if (!loading) {
       window.scrollTo({ top: scrollPosition.current, behavior: 'auto' });
@@ -295,7 +295,6 @@ function Dashboard() {
   const getMonthLabel = (offset) => {
     const now = new Date();
     now.setMonth(now.getMonth() + offset);
-    // Utilise 'en-US' pour l'anglais
     return `Month (${now.toLocaleString('en-US', { month: 'long', year: 'numeric' })})`;
   };
 
@@ -311,7 +310,7 @@ function Dashboard() {
     return isNaN(avg) ? 'N/A' : Math.round(avg * 100) / 100;
   };
 
-  // Fonction utilitaire pour le titre des valeurs à gauche
+  // Fonction utilitaire for getting the title of the values on the left
   const getValuesTitle = (period, type) => {
     switch (period) {
       case 'full-day':
@@ -334,7 +333,7 @@ function Dashboard() {
   const getLastValueBlock = (type, offset = 0) => {
     const arr = sensors[type] || [];
 
-    // Configuration des champs par type
+    // Configuration the fields par type
     const typeConfig = {
       light: {
         fields: [{ key: 'value', unit: 'Lux', format: formatLux, label: mode => `${mode === 'ext' ? 'Ext' : 'Int'} Lum`, picKey: '' }],
@@ -367,7 +366,7 @@ function Dashboard() {
       }
     };
 
-    // Helper pour calculer la moyenne mensuelle
+    // Helper for calculating the monthly average
     const getMonthlyAverage = (data, field) => {
       if (!data || !data.length) return 'N/A';
       const values = data.map(item => item[field] ?? item[`average_${field}`] ?? null).filter(v => v !== null && !isNaN(v));
@@ -388,13 +387,13 @@ function Dashboard() {
       });
     };
 
-    // Helper pour formater la valeur
+    // Helper for formatting the value
     const formatValue = (value, field) => {
       if (value === undefined || value === null || value === 'N/A') return 'N/A';
       return field.format ? field.format(value) : `${value} ${field.unit}`;
     };
 
-    // Helper pour générer le JSX d'une section de valeurs
+    // Helper for generating the JSX of a value section
     const renderValueBlock = (data, fields, mode, periodType) => {
       const isMonth = periodType === 'month';
       const isDayAverageOrWeek = periodType === 'day-average' || periodType === 'week';
@@ -530,8 +529,8 @@ function Dashboard() {
 
     const getWeekDates = (offset = 0) => {
       const today = new Date();
-      // JS: 0=dimanche, 1=lundi, ..., 6=samedi
-      const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); // dimanche=7
+      // JS: 0=sunday, 1=monday, ..., 6=saturday
+      const dayOfWeek = today.getDay() === 0 ? 7 : today.getDay(); // sunday=7
       const monday = new Date(today);
       monday.setDate(today.getDate() - (dayOfWeek - 1) + offset * 7);
       return Array.from({ length: 7 }, (_, i) => {
@@ -602,12 +601,12 @@ function Dashboard() {
                 series.chart.yAxis[yAxisIndex].update({
                   title: {
                     style: {
-                      color: '#FF0000', // Rouge pour mettre en évidence
+                      color: '#FF0000', // Red for highlighting
                       fontWeight: 'bold'
                     }
                   },
-                  lineWidth: 3, // Épaisseur de la ligne de l'axe
-                  lineColor: '#FF0000' // Couleur de la ligne de l'axe
+                  lineWidth: 3, // Line thickness
+                  lineColor: '#FF0000' // Line color
                 }, false);
                 series.chart.redraw();
               }
@@ -619,12 +618,12 @@ function Dashboard() {
                 series.chart.yAxis[yAxisIndex].update({
                   title: {
                     style: {
-                      color: '#000000', // Couleur par défaut
+                      color: '#000000', // Default color
                       fontWeight: 'normal'
                     }
                   },
-                  lineWidth: 1, // Épaisseur par défaut
-                  lineColor: '#000000' // Couleur par défaut
+                  lineWidth: 1, // Default thickness
+                  lineColor: '#000000' // Default color
                 }, false);
                 series.chart.redraw();
               }
@@ -936,7 +935,7 @@ function Dashboard() {
         }
       });
 
-      // Ajoute ce log ici, juste avant le return :
+      // Add this log here, just before the return:
       console.log('WEEK DEBUG', { type, categories, series });
 
       return {

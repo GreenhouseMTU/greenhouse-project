@@ -19,7 +19,7 @@ function HighchartsSection({
 }) {
   const chartRef = useRef(null);
 
-  // Sélectionne l'offset selon la période
+  // Selection the offset according to the period
   const offset = period[type] === 'week'
     ? weekOffset[type]
     : period[type] === 'month'

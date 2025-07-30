@@ -1,3 +1,10 @@
+// ErrorBoundary.jsx
+// This component is used to catch and display errors from its child components in the React component tree.
+// It prevents the entire app from crashing and provides a user-friendly error message with a reload option.
+// Used in AppHome.jsx to wrap critical UI modules like <Highlight />.
+
+
+
 import React from 'react';
 
 class ErrorBoundary extends React.Component {

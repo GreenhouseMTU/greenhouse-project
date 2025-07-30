@@ -81,7 +81,7 @@ export default function SoilTempHeatmap({ showInsights = false }) {
     },
     title: {
       text: 'Soil Temperature (°C)',
-      style: { fontSize: '1.25em', fontWeight: 'bold' } // Augmente la taille ici
+      style: { fontSize: '1.25em', fontWeight: 'bold' } 
 
     },
     xAxis: {
@@ -100,7 +100,7 @@ export default function SoilTempHeatmap({ showInsights = false }) {
       min: 0,
       max: 40,
       minColor: '#00BFFF',
-      maxColor: '#FF4500'
+      maxColor: '#ff5900ff'
     },
     legend: {
       align: 'right',

@@ -11,7 +11,7 @@ const greenhouseBounds = [
 ];
 
 function getInsight(extData, intData) {
-  // Filtrer pour ne garder que les jours où il y a des vraies valeurs (≠ 0)
+  
   const validExt = extData.filter(v => v && v > 0);
   const validInt = intData.filter(v => v && v > 0);
 
@@ -27,7 +27,7 @@ function getInsight(extData, intData) {
   const ratio = avgExt > 0 ? avgInt / avgExt : 0;
   const ratioPercent = Math.round(ratio * 100);
 
-  // Qualité du ratio
+  // Quality of the ratio
   const lightStatus = ratioPercent > 70 ? 'High'
                     : ratioPercent > 50 ? 'Medium'
                     : 'Low';
@@ -35,7 +35,7 @@ function getInsight(extData, intData) {
   let status = "";
   let advice = "";
 
-  // Cas spécial : extérieur faible mais intérieur bon
+  
   if (avgExt < 2000 && avgInt > 7000) {
     status = "💡 Good greenhouse performance despite cloudy weather.";
     advice = "Your greenhouse maintains good light for plants even with low outdoor light.";
@@ -169,7 +169,7 @@ export default function LightWeekAreaChart() {
         )}
     </div>
 
-    {/* Carte à droite, plus grande */}
+    {/* Card on right */}
     <div className="w-[34%] h-full">
         <MapContainer
         center={center}

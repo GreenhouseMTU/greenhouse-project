@@ -255,7 +255,6 @@ function Highlight() {
         <div className={`mb-1 transition-opacity duration-300 ${menuOpen ? 'opacity-100' : 'opacity-0'}`}>
           <span className="text-2xl font-bold text-[#f9f9ed] tracking-widest pl-10">MTU Insights</span>
         </div>
-        {/* Centrer verticalement le menu */}
         <ul className={`flex flex-col gap-8 transition-opacity duration-300 ${menuOpen ? 'opacity-100' : 'opacity-0'} pl-15 justify-center flex-1`}>
           {['home', 'dashboard', 'disconnect'].map((menu) => (
             <li
@@ -312,7 +311,7 @@ function Highlight() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-stretch">
             <div className="md:col-span-2">
               <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden dark:border-gray-800 dark:bg-white/[0.03] relative h-full flex flex-row">
-                {/* Heatmap à gauche */}
+                {/* Heatmap */}
                 <div className="w-[50%] flex items-center justify-center p-4">
                   <SoilTempHeatmap />
                 </div>

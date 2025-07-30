@@ -103,7 +103,7 @@ function Login() {
 
         if (data.access_token) {
           localStorage.setItem("username", username);
-          localStorage.setItem("access_token", data.access_token); // <-- corrige ici
+          localStorage.setItem("access_token", data.access_token); 
           navigate('/home');
         } else {
           alert("Login failed: " + data.message);
