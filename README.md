@@ -50,6 +50,9 @@ The frontend will run on port 8079 by default.
 - Configure proxy and SSL certificate for production deployment.
 - Add more advanced visualizations and analytics to the Highlight page.
 
+## Important note:  
+In this repository, files are configured to run **local (localhost)**.  
+When deploying to the server, all occurrences of `localhost` were replaced with the IP of the virtual machine: `172.31.1.13`.
 
 ## Usage
 
