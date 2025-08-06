@@ -64,6 +64,11 @@ cwd='/home/greenlab/greenhouse-master/backend'
 
 to allow proper subprocess execution when running on the Linux-based VM.
 
+## Deployment Outcome
+
+The project was successfully deployed on the remote server, with all services running in Docker containers. However, due to a networking issue (NS_ERROR_CONNECTION_REFUSED), the web interface could not be accessed via the server's public IP.
+The application works locally, and the server-side deployment is fully configured and ready once the connectivity issue is resolved.
+
 ## Usage
 
 -Access the web interface at http://localhost:8079
