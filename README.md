@@ -54,6 +54,16 @@ The frontend will run on port 8079 by default.
 In this repository, files are configured to run **local (localhost)**.  
 When deploying to the server, all occurrences of `localhost` were replaced with the IP of the virtual machine: `172.31.1.13`.
 
+Additionally, in the file backend/sensorCO2TempHumInt.py, the following line was updated to match the server's file system structure:
+
+cwd=r'd:\malea\Bureau\Clone\greenhouse-master\backend'
+
+was changed to:
+
+cwd='/home/greenlab/greenhouse-master/backend'
+
+to allow proper subprocess execution when running on the Linux-based VM.
+
 ## Usage
 
 -Access the web interface at http://localhost:8079
