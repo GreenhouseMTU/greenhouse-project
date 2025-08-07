@@ -6,8 +6,15 @@ from db import db
 auth_app = Blueprint('auth_app', __name__)
 
 # Register
-@auth_app.route('/api/users', methods=['POST'])
+@auth_app.route('/users', methods=['POST', 'OPTIONS'])
 def add_user():
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'CORS preflight successful'})
+        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8079')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+        return response
+
     new_user_data = request.json
     username = new_user_data.get('username')
     password = new_user_data.get('password')
@@ -25,7 +32,10 @@ def add_user():
     db.session.add(new_user)
     db.session.commit()
 
-    return jsonify({'message': 'User added successfully'}), 201
+    response = jsonify({'message': 'User added successfully'})
+    response.headers.add('Access-Control-Allow-Origin', 'http://localhost:8079')
+    return response, 201
+
 
 @auth_app.route('/login', methods=['POST', 'OPTIONS'])
 def login():

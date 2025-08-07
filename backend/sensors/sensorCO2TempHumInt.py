@@ -27,7 +27,7 @@ def get_sensorCO2TempHumInt():
 
 
 
-# Nouveau endpoint pic-average pour Sensor_CO2TempHum_int
+# New endpoint: pic-average for Sensor_CO2TempHum_int
 
 @sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/day/pic-average', methods=['GET'])
 @jwt_required()
@@ -38,22 +38,22 @@ def get_sensorCO2TempHumIntPicAverage():
 
     data_entries = db.session.query(Sensor_CO2TempHum_int).filter(Sensor_CO2TempHum_int.datetime.like(f'%{formatted_date}%')).all()
 
-    # Initialisation
+    # Initialization
     max_day = {'CO2': None, 'Temp': None, 'Hum': None}
     max_night = {'CO2': None, 'Temp': None, 'Hum': None}
 
     for entry in data_entries:
         hour = entry.datetime.hour
 
-        # jour ou nuit
+        # day or night
         period = 'day' if 6 <= hour < 20 else 'night'
 
-        # Récupère les valeurs du capteur
+        # Get sensor values
         val_CO2 = int(entry.valueCO2)
         val_Temp = int(entry.valueTemp)
         val_Hum = int(entry.valueHum)
 
-        # Fonction de comparaison
+        # Comparison function
         def update_max(val, current_max):
             return val if current_max is None or val > current_max else current_max
 
@@ -66,7 +66,7 @@ def get_sensorCO2TempHumIntPicAverage():
             max_night['Temp'] = update_max(val_Temp, max_night['Temp'])
             max_night['Hum'] = update_max(val_Hum, max_night['Hum'])
 
-    # On calcule les pic-averages
+    # Calculate pic-averages
     result = {}
 
     for key in ['CO2', 'Temp', 'Hum']:
@@ -114,11 +114,11 @@ def get_sensorCO2TempHumIntDayAverage():
         avg_valueCO2 = sum(data['valuesCO2']) / len(data['valuesCO2'])
         avg_valueTemp = sum(data['valuesTemp']) / len(data['valuesTemp'])
         avg_valueHum = sum(data['valuesHum']) / len(data['valuesHum'])
-        
+       
         avg_valueCO2_rounded = round(avg_valueCO2, 2)
         avg_valueTemp_rounded = round(avg_valueTemp, 2)
         avg_valueHum_rounded = round(avg_valueHum, 2)
-        
+       
         results.append({
             'hour': time,
             'average_valueCO2': avg_valueCO2_rounded,
@@ -186,7 +186,7 @@ def get_sensorCO2TempHumIntWeek():
 def get_sensorCO2TempHumIntMonth():
     current_date = datetime.now()
     start_date_month = current_date - timedelta(days=30)
-    
+   
     sensorCO2TempHumIntMonthValues = db.session.query(Sensor_CO2TempHum_int).filter(
         Sensor_CO2TempHum_int.datetime >= start_date_month,
         Sensor_CO2TempHum_int.datetime <= current_date
@@ -236,14 +236,14 @@ def get_sensorCO2TempHumIntMonth():
 
     return jsonify(results)
 
-# Récupérer les données des 3 derniers jours
+# Get data from the last 3 days
 @sensor_co2temphum_int_app.route('/api/sensors/sensor_co2temphum_int/last_3_days', methods=['GET'])
 @jwt_required()
 def get_sensorCO2TempHumIntLast3Days():
     current_date = datetime.now()
     start_date = current_date - timedelta(days=3)
 
-    
+   
     data_entries = db.session.query(Sensor_CO2TempHum_int).filter(
         Sensor_CO2TempHum_int.datetime >= start_date,
         Sensor_CO2TempHum_int.datetime <= current_date
@@ -262,15 +262,14 @@ def get_sensorCO2TempHumIntLast3Days():
 
     return jsonify(results)
 
-# analyser les tendances des données extraites
+# Analyze trends from extracted data
 def analyze_trends(data):
-    trends = {}
-    temps = [entry['valueTemp'] for entry in data]
-    hums = [entry['valueHum'] for entry in data]
-    co2s = [entry['valueCO2'] for entry in data]
+    import math
+    from datetime import datetime, timedelta
 
-    # Calculer les moyennes quotidiennes
+    trends = {}
     daily_data = {}
+
     for entry in data:
         date_str = entry['datetime'].split(' ')[0]
         if date_str not in daily_data:
@@ -287,11 +286,17 @@ def analyze_trends(data):
             'average_co2': round(sum(values['co2s']) / len(values['co2s']), 2)
         }
 
-    # Calculer les moyennes des 3 derniers jours
-    sorted_dates = sorted(daily_averages.keys())[-3:]  # Les 3 derniers jours
-    three_day_temps = [daily_averages[date]['average_temp'] for date in sorted_dates]
-    three_day_hums = [daily_averages[date]['average_hum'] for date in sorted_dates]
-    three_day_co2s = [daily_averages[date]['average_co2'] for date in sorted_dates]
+    # Always take the last 3 days (even if there is no data)
+    today = datetime.now().date()
+    last_three_dates = [
+        (today - timedelta(days=2)).strftime('%Y-%m-%d'),
+        (today - timedelta(days=1)).strftime('%Y-%m-%d'),
+        today.strftime('%Y-%m-%d')
+    ]
+
+    three_day_temps = [daily_averages.get(date, {'average_temp': 0})['average_temp'] for date in last_three_dates]
+    three_day_hums = [daily_averages.get(date, {'average_hum': 0})['average_hum'] for date in last_three_dates]
+    three_day_co2s = [daily_averages.get(date, {'average_co2': 0})['average_co2'] for date in last_three_dates]
 
     def compute_stats(values):
         if not values:
@@ -304,7 +309,6 @@ def analyze_trends(data):
             "variability": f"±{std_dev}"
         }
 
-    # Détecter les tendances
     def detect_trend(metric, values):
         start = values[0]
         end = values[-1]
@@ -325,27 +329,25 @@ def analyze_trends(data):
     trends['temperature'] = detect_trend('Temp', three_day_temps)
     trends['humidity'] = detect_trend('Hum', three_day_hums)
     trends['co2'] = detect_trend('CO2', three_day_co2s)
-
-    # Ajouter les moyennes quotidiennes pour référence
     trends['daily_averages'] = daily_averages
     return trends
 
 
 def generate_summary(trends):
     trends_json = json.dumps(trends)  # Convertit les tendances en JSON
-    print(f"JSON passed to Node.js: {trends_json}")  # Log pour vérifier les données
+    print(f"JSON passed to Node.js: {trends_json}")  # Log to check the data
 
     try:
         result = subprocess.run(
             ['node', 'generateSummary.js'],
-            input=trends_json,  # Passe le JSON en entrée standard (stdin)
+            input=trends_json,  # Pass JSON as standard input (stdin)
             capture_output=True,
             text=True,
-            encoding='utf-8',  # Force l'encodage UTF-8
-            cwd=r'd:\malea\Bureau\Clone\greenhouse-master\backend'  # Chemin absolu vers le script
+            encoding='utf-8',  # Force UTF-8 encoding
+            cwd=r'C:\Users\teaPOT\Desktop\greenhouse-project\backend'
         )
         if result.returncode == 0:
-            return json.loads(result.stdout.strip())  # Parse le tableau JSON renvoyé par Node.js
+            return json.loads(result.stdout.strip())  # Parse the JSON array returned by Node.js
         else:
             print(f"Node.js script error: {result.stderr}")
             raise Exception(f"Node.js script error: {result.stderr}")

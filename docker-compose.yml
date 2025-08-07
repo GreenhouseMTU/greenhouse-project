@@ -39,7 +39,7 @@ services:
       context: ./frontend
       dockerfile: ./Dockerfile
     ports:
-            - "8079:8079"
+            - "8079:80"
     restart: always
     networks:
       - front-network

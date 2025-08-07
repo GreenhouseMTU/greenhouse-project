@@ -413,32 +413,35 @@ function Highlight() {
                 <h2 className="text-xl font-semibold mb-4 text-black text-center">Insights (3 days)</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="rounded-xl bg-orange-50 border border-orange-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 min-h-[300px] flex flex-col justify-between transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-2xl cursor-pointer">
-                    {Array.isArray(insights) && insights[0] ? (
-                      <>
-                        <h3 className="text-lg font-semibold text-orange-500 text-center">{insights[0].title}</h3>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-4">
-                          {insights[0].data.split(' ')[0]}
-                        </p>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
-                          {insights[0].data.split(' ')[1]}
-                        </p>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
-                          {insights[0].data.split(' ')[2]}
-                        </p>
-                        <h4 className="text-lg font-semibold text-orange-600 dark:text-gray-400 text-center mt-4">
-                          {insights[0].overallTitle}
-                        </h4>
-                        <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-2">
-                          {insights[0].overallAverage}
-                          <br />
-                          <span className="text-[20px] font-normal text-gray-500">
-                            {insights[0].variability !== undefined && insights[0].variability !== null ? `${insights[0].variability}` : ''}
-                          </span>
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-gray-500 italic text-center">Loading...</p>
-                    )}
+                    {Array.isArray(insights) && insights[0]?.data
+                      ? (
+                          <>
+                            <h3 className="text-lg font-semibold text-orange-500 text-center">{insights[0].title}</h3>
+                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-4">
+                              {insights[0].data.split(' ')[0]}
+                            </p>
+                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                              {insights[0].data.split(' ')[1]}
+                            </p>
+                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center">
+                              {insights[0].data.split(' ')[2]}
+                            </p>
+                            <h4 className="text-lg font-semibold text-orange-600 dark:text-gray-400 text-center mt-4">
+                              {insights[0].overallTitle}
+                            </h4>
+                            <p className="text-2xl font-bold text-gray-800 dark:text-gray-200 text-center mt-2">
+                              {insights[0].overallAverage}
+                              <br />
+                              <span className="text-[20px] font-normal text-gray-500">
+                                {insights[0].variability !== undefined && insights[0].variability !== null ? `${insights[0].variability}` : ''}
+                              </span>
+                            </p>
+                          </>
+                        )
+                      : (
+                          <p className="text-gray-500 italic text-center">Loading...</p>
+                        )
+                    }
                   </div>
                   <div className="rounded-xl bg-blue-50 border border-blue-200 p-6 dark:bg-white/[0.03] dark:border-gray-800 min-h-[300px] flex flex-col justify-between transition-all duration-200 ease-in-out transform hover:scale-105 hover:shadow-2xl cursor-pointer">
                     {Array.isArray(insights) && insights[1] ? (
